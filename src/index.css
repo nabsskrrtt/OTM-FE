@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+@theme {
+  --color-paragon-dark: #0B2545;
+  --color-paragon-medium: #134074;
+  --color-paragon-light: #8DA9C4;
+  --color-paragon-ice: #EEF4F8;
+  --color-paragon-blue: #1E3A8A;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #F8FAFC;
+  color: #0F172A;
+  margin: 0;
+  padding: 0;
+}
+
+/* Custom fade transitions */
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}
