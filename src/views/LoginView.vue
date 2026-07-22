@@ -4,7 +4,8 @@ import { useRouter } from 'vue-router'
 import { Award, Play, History, UserCheck, HelpCircle, X } from 'lucide-vue-next'
 
 const router = useRouter()
-const API_BASE = 'http://localhost:3000/api'
+const API_HOST = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+const API_BASE = `${API_HOST}/api`
 
 // State
 const participantsList = ref([])
@@ -25,7 +26,7 @@ const historyLeaderboard = ref([])
 
 async function viewSessionLeaderboard(sessionItem) {
   try {
-    const res = await fetch(`http://localhost:3000/api/sessions/${sessionItem.session_id}/leaderboard`)
+    const res = await fetch(`${API_BASE}/sessions/${sessionItem.session_id}/leaderboard`)
     if (res.ok) {
       const data = await res.json()
       selectedHistorySession.value = data.session

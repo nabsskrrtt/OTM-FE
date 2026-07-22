@@ -4,7 +4,8 @@ import { useRouter } from 'vue-router'
 import { Hourglass, Trophy, ArrowLeft, Send, CheckCircle2, XCircle } from 'lucide-vue-next'
 
 const router = useRouter()
-const API_BASE = 'http://localhost:3000/api'
+const API_HOST = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+const API_BASE = `${API_HOST}/api`
 
 // Participant info
 const participant = ref(null)
@@ -427,7 +428,7 @@ onUnmounted(() => {
           <!-- Question Image if available -->
           <div v-if="currentQuestion.image_path" class="w-full rounded-xl overflow-hidden bg-slate-50 border border-slate-100">
             <img 
-              :src="`http://localhost:3000${currentQuestion.image_path}`" 
+              :src="`${API_HOST}${currentQuestion.image_path}`" 
               alt="Context illustration" 
               class="w-full h-auto max-h-60 object-contain mx-auto"
             />

@@ -8,7 +8,8 @@ import {
 } from 'lucide-vue-next'
 
 const router = useRouter()
-const API_BASE = 'http://localhost:3000/api'
+const API_HOST = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+const API_BASE = `${API_HOST}/api`
 const locationOrigin = window.location.origin
 
 // Auth Check
@@ -879,7 +880,7 @@ function getOptionSubmitPercentage(option) {
               <!-- Optional Question Image -->
               <div v-if="questions[activeSession.current_question_index]?.image_path" class="w-full rounded-2xl overflow-hidden bg-slate-950 p-4 border border-white/5 max-h-64 flex items-center justify-center">
                 <img 
-                  :src="`http://localhost:3000${questions[activeSession.current_question_index]?.image_path}`" 
+                  :src="`${API_HOST}${questions[activeSession.current_question_index]?.image_path}`" 
                   alt="Presentation context" 
                   class="max-w-full max-h-60 object-contain"
                 />
