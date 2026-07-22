@@ -58,7 +58,10 @@ async function fetchParticipants() {
 // Check active session status
 async function checkActiveSession() {
   try {
-    const res = await fetch(`${API_BASE}/sessions/active`)
+    const url = currentParticipant.value 
+      ? `${API_BASE}/sessions/active?participant_id=${currentParticipant.value.id}`
+      : `${API_BASE}/sessions/active`
+    const res = await fetch(url)
     if (res.ok) {
       const data = await res.json()
       if (data.active) {

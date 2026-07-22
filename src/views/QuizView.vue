@@ -18,6 +18,7 @@ const answersSubmitted = ref({}) // tracks answers submitted in this browser tab
 const shortAnswerInput = ref('')
 const feedback = ref(null) // feedback for the current question { is_correct, score, correct_answer, explanation }
 const leaderboard = ref([]) // Top 3 or full leaderboard
+const joinedParticipants = ref([]) // participants in waiting room / active session
 const loading = ref(false)
 
 // Timer setup
@@ -35,7 +36,10 @@ const timerProgressWidth = computed(() => {
 // Check session state and poll
 async function fetchActiveSession() {
   try {
-    const res = await fetch(`${API_BASE}/sessions/active`)
+    const url = participant.value
+      ? `${API_BASE}/sessions/active?participant_id=${participant.value.id}`
+      : `${API_BASE}/sessions/active`
+    const res = await fetch(url)
     if (!res.ok) return
 
     const data = await res.json()
@@ -50,9 +54,17 @@ async function fetchActiveSession() {
     sessionActive.value = true
     const oldSession = sessionData.value
     sessionData.value = data.session
+    joinedParticipants.value = data.participants || []
 
-    // If session is active and question index is valid
-    if (data.session.status === 'active' && data.session.question) {
+    // If session is active and leaderboard is showing
+    if (data.session.status === 'active' && data.session.show_leaderboard) {
+      currentQuestion.value = null
+      feedback.value = null
+      if (timerInterval) clearInterval(timerInterval)
+      fetchLeaderboard()
+    }
+    // If session is active and quiz is in progress (current_question_index >= 0)
+    else if (data.session.status === 'active' && data.session.question) {
       const newQ = data.session.question
       
       // If we switched to a new question
@@ -285,27 +297,112 @@ onUnmounted(() => {
     <template v-else>
       <!-- 1. Lobby Waiting Screen (index = -1) -->
       <div 
-        v-if="sessionActive && sessionData && sessionData.status === 'draft'" 
+        v-if="sessionActive && sessionData && (sessionData.status === 'draft' || sessionData.current_question_index === -1)" 
         class="bg-white rounded-2xl border border-slate-100 shadow-xl p-8 text-center space-y-6"
       >
-      <div class="relative w-24 h-24 mx-auto bg-paragon-ice rounded-3xl flex items-center justify-center">
-        <span class="absolute w-20 h-20 border-4 border-paragon-light/30 border-t-paragon-medium rounded-full animate-spin"></span>
-        <Hourglass class="w-8 h-8 text-paragon-medium animate-pulse" />
+        <div class="relative w-24 h-24 mx-auto bg-paragon-ice rounded-3xl flex items-center justify-center">
+          <span class="absolute w-20 h-20 border-4 border-paragon-light/30 border-t-paragon-medium rounded-full animate-spin"></span>
+          <Hourglass class="w-8 h-8 text-paragon-medium animate-pulse" />
+        </div>
+
+        <div class="space-y-2">
+          <h2 class="text-2xl font-black text-paragon-dark">Menunggu PIC Memulai</h2>
+          <p class="text-xs text-slate-500 max-w-sm mx-auto">
+            Sesi live terhubung. Bersiaplah untuk menjawab 5 sampai 10 pertanyaan sharing Parmasys!
+          </p>
+        </div>
+
+        <!-- Realtime Display of Joined Participants -->
+        <div class="space-y-3 pt-4 border-t border-slate-100 text-left">
+          <h3 class="text-xs font-black uppercase text-slate-400 tracking-wider">
+            Peserta Bergabung ({{ joinedParticipants.length }})
+          </h3>
+          <div v-if="joinedParticipants.length === 0" class="text-slate-400 text-xs font-semibold py-4 text-center border border-dashed border-slate-200 rounded-xl bg-slate-50">
+            Menunggu peserta lain masuk...
+          </div>
+          <div v-else class="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
+            <div 
+              v-for="p in joinedParticipants" 
+              :key="p.id" 
+              class="px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 truncate text-center"
+            >
+              {{ p.name }}
+            </div>
+          </div>
+        </div>
+
+        <div class="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-2 text-left text-xs text-slate-600">
+          <div class="flex justify-between"><span>Parmasys Ref:</span> <strong class="text-slate-800">{{ sessionData.reference }}</strong></div>
+          <div class="flex justify-between"><span>PIC Briefing:</span> <strong class="text-slate-800">{{ sessionData.pic_karyawan }} &amp; {{ sessionData.pic_intern }}</strong></div>
+          <div class="flex justify-between"><span>Tanggal Sesi:</span> <strong class="text-slate-800">{{ sessionData.date }}</strong></div>
+        </div>
       </div>
 
-      <div class="space-y-2">
-        <h2 class="text-2xl font-black text-paragon-dark">Menunggu PIC Memulai</h2>
-        <p class="text-xs text-slate-500 max-w-sm mx-auto">
-          Sesi live terhubung. Bersiaplah untuk menjawab 5 sampai 10 pertanyaan sharing Parmasys!
-        </p>
-      </div>
+      <!-- 1.5. Temporary Leaderboard Screen -->
+      <div 
+        v-else-if="sessionActive && sessionData && sessionData.status === 'active' && sessionData.show_leaderboard" 
+        class="bg-white rounded-2xl border border-slate-100 shadow-xl p-6 md:p-8 space-y-6 text-center"
+      >
+        <div class="space-y-2">
+          <Trophy class="w-12 h-12 text-amber-500 mx-auto animate-bounce" />
+          <h2 class="text-2xl font-black text-paragon-dark">Leaderboard Sementara</h2>
+          <p class="text-xs text-slate-500">
+            Berikut adalah posisi sementara! Bersiaplah untuk pertanyaan berikutnya.
+          </p>
+        </div>
 
-      <div class="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-2 text-left text-xs text-slate-600">
-        <div class="flex justify-between"><span>Parmasys Ref:</span> <strong class="text-slate-800">{{ sessionData.reference }}</strong></div>
-        <div class="flex justify-between"><span>PIC Briefing:</span> <strong class="text-slate-800">{{ sessionData.pic }}</strong></div>
-        <div class="flex justify-between"><span>Tanggal Sesi:</span> <strong class="text-slate-800">{{ sessionData.date }}</strong></div>
+        <!-- Podium Top 3 Layout for Temporary Leaderboard -->
+        <div class="grid grid-cols-3 gap-2 items-end pt-4 pb-6 max-w-sm mx-auto">
+          <!-- 2nd Place -->
+          <div class="flex flex-col items-center">
+            <div class="text-xs font-bold text-slate-600 truncate w-full max-w-20">{{ leaderboard[1]?.name || 'Peserta' }}</div>
+            <div class="text-[10px] font-black text-paragon-medium">{{ leaderboard[1]?.current_score || 0 }} Pts</div>
+            <div class="w-full bg-slate-100 border border-slate-200/50 rounded-t-xl h-16 flex items-center justify-center mt-2">
+              <span class="text-xl font-extrabold text-slate-400">2</span>
+            </div>
+          </div>
+          <!-- 1st Place -->
+          <div class="flex flex-col items-center">
+            <div class="text-xs font-extrabold text-amber-600 truncate w-full max-w-20">{{ leaderboard[0]?.name || 'Peserta' }}</div>
+            <div class="text-xs font-black text-amber-500">{{ leaderboard[0]?.current_score || 0 }} Pts</div>
+            <div class="w-full bg-amber-50 border border-amber-200 rounded-t-xl h-24 flex items-center justify-center mt-2 relative shadow-md">
+              <span class="text-3xl font-black text-amber-500">1</span>
+              <span class="absolute -top-3 text-lg">👑</span>
+            </div>
+          </div>
+          <!-- 3rd Place -->
+          <div class="flex flex-col items-center">
+            <div class="text-xs font-bold text-slate-600 truncate w-full max-w-20">{{ leaderboard[2]?.name || 'Peserta' }}</div>
+            <div class="text-[10px] font-black text-paragon-medium">{{ leaderboard[2]?.current_score || 0 }} Pts</div>
+            <div class="w-full bg-slate-50 border border-slate-100 rounded-t-xl h-12 flex items-center justify-center mt-2">
+              <span class="text-lg font-extrabold text-slate-400">3</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rest of the Participants List -->
+        <div v-if="leaderboard.length > 3" class="text-left space-y-2 border-t border-slate-100 pt-4">
+          <h3 class="text-xs font-bold uppercase text-slate-400 mb-3 tracking-widest">Peringkat Lainnya</h3>
+          <div class="space-y-1.5 max-h-40 overflow-y-auto">
+            <div 
+              v-for="(p, idx) in leaderboard.slice(3)" 
+              :key="p.id" 
+              class="flex justify-between items-center px-4 py-2 bg-slate-50 rounded-lg text-xs"
+            >
+              <div class="font-semibold text-slate-700">
+                <span class="text-slate-400 mr-2">#{{ idx + 4 }}</span>
+                <span>{{ p.name }}</span>
+              </div>
+              <div class="font-bold text-paragon-medium">{{ p.current_score }} Pts</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="text-center py-4 space-y-2 border-t border-slate-100">
+          <span class="inline-block w-5 h-5 border-2 border-slate-200 border-t-paragon-medium rounded-full animate-spin"></span>
+          <p class="text-xs text-slate-500 font-bold">Menunggu admin melanjutkan ke pertanyaan berikutnya...</p>
+        </div>
       </div>
-    </div>
 
     <!-- 2. Question View Screen -->
     <div v-else-if="sessionActive && currentQuestion" class="space-y-4">
@@ -320,7 +417,8 @@ onUnmounted(() => {
         <!-- Timer Bar -->
         <div class="h-2 bg-slate-100 w-full overflow-hidden">
           <div 
-            class="h-full bg-gradient-to-r from-paragon-light to-paragon-medium transition-all duration-100" 
+            class="h-full bg-gradient-to-r transition-all duration-100" 
+            :class="timeLeft <= 5 ? 'from-red-500 to-red-600 bg-red-500' : 'from-paragon-light to-paragon-medium bg-paragon-medium'"
             :style="{ width: `${timerProgressWidth}%` }"
           ></div>
         </div>
@@ -335,10 +433,24 @@ onUnmounted(() => {
             />
           </div>
 
-          <!-- Question Text -->
-          <h2 class="text-lg md:text-xl font-black text-paragon-dark leading-snug">
-            {{ currentQuestion.question_text }}
-          </h2>
+          <!-- Question Text + Countdown Circle/Box -->
+          <div class="flex justify-between items-start gap-4">
+            <h2 class="text-lg md:text-xl font-black text-paragon-dark leading-snug flex-1">
+              {{ currentQuestion.question_text }}
+            </h2>
+
+            <!-- Numerical Countdown Box -->
+            <div 
+              v-if="!feedback && timeLeft > 0"
+              class="w-14 h-14 rounded-2xl flex flex-col items-center justify-center border font-black text-lg flex-shrink-0 transition-all duration-300 shadow-sm"
+              :class="timeLeft <= 5 
+                ? 'border-red-500 text-red-500 bg-red-50 animate-bounce scale-110' 
+                : 'border-slate-200 text-slate-700 bg-slate-50'"
+            >
+              <span>{{ Math.ceil(timeLeft) }}</span>
+              <span class="text-[8px] uppercase tracking-wider opacity-75 leading-none mt-0.5">detik</span>
+            </div>
+          </div>
 
           <!-- Inputs Layer (if NOT answered yet) -->
           <div v-if="!feedback" class="space-y-3">
