@@ -1098,33 +1098,33 @@ function getOptionSubmitPercentage(option) {
         </div>
 
         <!-- Scrollable Historical Sessions List -->
-        <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-xl space-y-4">
-          <h3 class="font-extrabold text-base text-paragon-dark border-b border-slate-100 pb-3">Daftar Semua Sesi</h3>
+        <div class="bg-dark-surface p-6 rounded-3xl border border-dark-border shadow-xl space-y-4">
+          <h3 class="font-extrabold text-base text-paragon-light border-b border-dark-border pb-3">Daftar Semua Sesi</h3>
           
-          <div class="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+          <div class="space-y-2.5 max-h-72 overflow-y-auto pr-2">
             <div 
               v-for="s in sessions" 
               :key="s.id" 
-              class="p-3 border rounded-xl flex items-center justify-between text-xs transition-all cursor-pointer"
-              :class="activeSession?.id === s.id ? 'border-paragon-medium bg-paragon-ice' : 'border-slate-100 bg-slate-50/50 hover:bg-slate-50'"
+              class="p-3 border rounded-2xl flex items-center justify-between text-xs transition-all cursor-pointer"
+              :class="activeSession?.id === s.id ? 'border-paragon-medium bg-paragon-medium/10 text-paragon-ice' : 'border-dark-border bg-dark-surface-hover hover:border-paragon-light/30 text-dark-text'"
             >
               <div class="space-y-1 flex-1 min-w-0" @click="selectActiveSession(s)">
                 <div class="flex items-center space-x-2">
-                  <span class="font-extrabold text-slate-500">{{ s.date }}</span>
+                  <span class="font-extrabold text-dark-text-secondary">{{ s.date }}</span>
                   <span 
                     class="px-1.5 py-0.5 rounded text-[8px] uppercase font-bold"
-                    :class="s.status === 'active' ? 'bg-emerald-100 text-emerald-800' : s.status === 'draft' ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-600'"
+                    :class="s.status === 'active' ? 'bg-emerald-500/20 text-emerald-300' : s.status === 'draft' ? 'bg-amber-500/20 text-amber-300' : 'bg-dark-border text-dark-text-secondary'"
                   >
                     {{ s.status }}
                   </span>
                 </div>
-                <h4 class="font-black text-slate-700 truncate">{{ s.reference }}</h4>
-                <p class="text-[10px] text-slate-400 truncate">PIC: {{ s.pic_karyawan }} &amp; {{ s.pic_intern }}</p>
+                <h4 class="font-black truncate">{{ s.reference }}</h4>
+                <p class="text-[10px] text-dark-text-secondary/70 truncate">PIC: {{ s.pic_karyawan }} &amp; {{ s.pic_intern }}</p>
               </div>
               
               <button 
                 @click.stop="deleteSession(s.id)" 
-                class="p-1.5 text-slate-400 hover:text-red-600 rounded bg-white border border-slate-100 shadow-sm ml-2"
+                class="p-1.5 text-dark-text-secondary hover:text-red-400 rounded bg-dark-surface-hover border border-dark-border shadow-sm ml-2 hover:border-red-500/30"
               >
                 <Trash2 class="w-3 h-3" />
               </button>
@@ -1134,12 +1134,12 @@ function getOptionSubmitPercentage(option) {
       </div>
 
       <!-- Live Quiz Panel -->
-      <div class="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-100 shadow-xl space-y-6">
-        <h3 class="font-extrabold text-base text-paragon-dark border-b border-slate-100 pb-3 flex items-center justify-between">
+      <div class="lg:col-span-2 bg-dark-surface p-6 rounded-3xl border border-dark-border shadow-xl space-y-6">
+        <h3 class="font-extrabold text-base text-paragon-light border-b border-dark-border pb-3 flex items-center justify-between">
           <span>Kontrol Kuis Real-Time</span>
           <span 
             v-if="activeSession" 
-            class="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-paragon-ice text-paragon-medium"
+            class="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-paragon-medium/20 text-paragon-ice"
           >
             Aktif: {{ activeSession.reference }}
           </span>
@@ -1278,14 +1278,14 @@ function getOptionSubmitPercentage(option) {
     </div>
 
     <!-- TAB 2: Question Manager Panel (DRAG & DROP PERSISTENCE) -->
-    <div v-if="activeTab === 'questions'" class="bg-white p-6 rounded-2xl border border-slate-100 shadow-xl space-y-6">
-      <div class="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-100 pb-4 gap-4">
+    <div v-if="activeTab === 'questions'" class="bg-dark-surface p-6 rounded-3xl border border-dark-border shadow-xl space-y-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between border-b border-dark-border pb-4 gap-4">
         <div class="flex items-center space-x-3">
-          <h3 class="font-extrabold text-base text-paragon-dark">Pengelola Pertanyaan Kuis</h3>
+          <h3 class="font-extrabold text-base text-paragon-light">Pengelola Pertanyaan Kuis</h3>
           <select 
             v-model="selectedSessionIdForQuestions" 
             @change="onSessionSelectForQuestions"
-            class="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-lg px-3 py-2 outline-none focus:border-paragon-medium"
+            class="bg-dark-surface-hover border border-dark-border text-dark-text text-xs font-bold rounded-xl px-3 py-2 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30"
           >
             <option value="" disabled>-- Pilih Sesi --</option>
             <option v-for="s in sessions" :key="s.id" :value="s.id">
@@ -1305,10 +1305,10 @@ function getOptionSubmitPercentage(option) {
       </div>
 
       <!-- Question List -->
-      <div v-if="!selectedSessionIdForQuestions" class="text-center py-10 text-slate-400 text-xs font-semibold">
+      <div v-if="!selectedSessionIdForQuestions" class="text-center py-10 text-dark-text-secondary text-xs font-semibold">
         Silakan pilih sesi di atas untuk mengelola soal.
       </div>
-      <div v-else-if="questions.length === 0" class="text-center py-10 text-slate-400 text-xs font-semibold">
+      <div v-else-if="questions.length === 0" class="text-center py-10 text-dark-text-secondary text-xs font-semibold">
         Belum ada pertanyaan pada sesi ini. Klik "+ Tambah Soal" di atas untuk menambahkan.
       </div>
 
@@ -1431,19 +1431,19 @@ function getOptionSubmitPercentage(option) {
       </div>
 
       <!-- Participant List grid -->
-      <div class="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-100 shadow-xl space-y-6">
-        <h3 class="font-extrabold text-base text-paragon-dark border-b border-slate-100 pb-3 flex items-center justify-between">
+      <div class="lg:col-span-2 bg-dark-surface p-6 rounded-3xl border border-dark-border shadow-xl space-y-6">
+        <h3 class="font-extrabold text-base text-paragon-light border-b border-dark-border pb-3 flex items-center justify-between">
           <span>Daftar Nama Predistribusi (Total: {{ participants.length }})</span>
         </h3>
 
-        <div class="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+        <div class="space-y-2 max-h-[420px] overflow-y-auto pr-2">
           <div 
             v-for="p in participants" 
             :key="p.id" 
-            class="flex items-center justify-between p-3 border border-slate-100 hover:bg-slate-50 rounded-xl transition-all"
+            class="flex items-center justify-between p-3 border border-dark-border hover:border-paragon-light/30 hover:bg-dark-surface-hover rounded-2xl transition-all"
           >
             <!-- Normal State -->
-            <div v-if="editingParticipant?.id !== p.id" class="text-xs font-bold text-slate-700">
+            <div v-if="editingParticipant?.id !== p.id" class="text-xs font-bold text-dark-text">
               {{ p.name }}
             </div>
             
@@ -1452,25 +1452,25 @@ function getOptionSubmitPercentage(option) {
               <input 
                 v-model="editingParticipant.name" 
                 type="text" 
-                class="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs font-semibold rounded-lg px-2.5 py-1.5 focus:border-paragon-medium outline-none"
+                class="w-full bg-dark-surface-hover border border-dark-border text-dark-text text-xs font-semibold rounded-xl px-2.5 py-1.5 focus:border-paragon-medium outline-none focus:ring-2 focus:ring-paragon-medium/30"
               />
             </div>
 
             <!-- Action buttons -->
             <div class="flex items-center space-x-2">
               <div v-if="editingParticipant?.id !== p.id" class="flex items-center space-x-2">
-                <button @click="startEditParticipant(p)" class="p-1.5 text-slate-400 hover:text-paragon-medium bg-slate-50 hover:bg-paragon-ice border border-slate-100 rounded-lg transition-all">
+                <button @click="startEditParticipant(p)" class="p-1.5 text-dark-text-secondary hover:text-paragon-light bg-dark-surface-hover hover:bg-paragon-medium/10 border border-dark-border rounded-lg transition-all">
                   <Edit2 class="w-3 h-3" />
                 </button>
-                <button @click="deleteParticipant(p.id)" class="p-1.5 text-slate-400 hover:text-red-600 bg-slate-50 hover:bg-red-50 border border-slate-100 rounded-lg transition-all">
+                <button @click="deleteParticipant(p.id)" class="p-1.5 text-dark-text-secondary hover:text-red-400 bg-dark-surface-hover hover:bg-red-500/10 border border-dark-border rounded-lg transition-all hover:border-red-500/30">
                   <Trash2 class="w-3 h-3" />
                 </button>
               </div>
               <div v-else class="flex items-center space-x-1">
-                <button @click="saveEditParticipant" class="p-1.5 text-emerald-600 hover:bg-emerald-50 border border-emerald-100 rounded-lg transition-all">
+                <button @click="saveEditParticipant" class="p-1.5 text-emerald-400 hover:bg-emerald-500/10 border border-emerald-500/30 rounded-lg transition-all">
                   <Check class="w-3 h-3" />
                 </button>
-                <button @click="editingParticipant = null" class="p-1.5 text-red-500 hover:bg-red-50 border border-red-100 rounded-lg transition-all">
+                <button @click="editingParticipant = null" class="p-1.5 text-red-400 hover:bg-red-500/10 border border-red-500/30 rounded-lg transition-all">
                   <X class="w-3 h-3" />
                 </button>
               </div>
@@ -1483,25 +1483,25 @@ function getOptionSubmitPercentage(option) {
     <!-- TAB 4: Reporting & Backup settings -->
     <div v-if="activeTab === 'reports'" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- Winner monthly tracker -->
-      <div class="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-100 shadow-xl space-y-6">
-        <h3 class="font-extrabold text-base text-paragon-dark border-b border-slate-100 pb-3">Monthly Top 3 Tracker</h3>
+      <div class="lg:col-span-1 bg-dark-surface p-6 rounded-3xl border border-dark-border shadow-xl space-y-6">
+        <h3 class="font-extrabold text-base text-paragon-light border-b border-dark-border pb-3">Monthly Top 3 Tracker</h3>
 
         <div class="space-y-4">
           <div>
-            <label class="block text-xs font-bold text-slate-600 mb-1.5">Pilih Bulan Laporan</label>
+            <label class="block text-xs font-bold text-paragon-light mb-1.5">Pilih Bulan Laporan</label>
             <input 
               v-model="selectedMonth" 
               type="month" 
               @change="fetchMonthlyLeaderboard"
-              class="w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-lg px-3 py-2.5 outline-none focus:border-paragon-medium"
+              class="w-full bg-dark-surface-hover border border-dark-border text-dark-text text-xs font-bold rounded-xl px-3 py-2.5 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30"
             />
           </div>
 
           <!-- Top 3 display -->
           <div class="space-y-3 pt-2">
-            <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pemenang Top 3 Kuis</h4>
+            <h4 class="text-[10px] font-black text-paragon-light/60 uppercase tracking-widest">Pemenang Top 3 Kuis</h4>
             
-            <div v-if="monthlyLeaderboard.length === 0" class="text-slate-400 text-xs py-4 font-semibold text-center bg-slate-50 rounded-xl">
+            <div v-if="monthlyLeaderboard.length === 0" class="text-dark-text-secondary text-xs py-4 font-semibold text-center bg-dark-surface-hover rounded-xl">
               Belum ada data nilai di bulan ini.
             </div>
             
@@ -1510,7 +1510,7 @@ function getOptionSubmitPercentage(option) {
                 v-for="(w, idx) in monthlyLeaderboard.slice(0, 3)" 
                 :key="w.participant_id" 
                 class="flex items-center justify-between p-3.5 rounded-xl border"
-                :class="idx === 0 ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-slate-50 border-slate-100 text-slate-700'"
+                :class="idx === 0 ? 'bg-amber-500/10 border-amber-500/30 text-amber-300' : 'bg-dark-surface-hover border-dark-border text-dark-text-secondary'"
               >
                 <div class="flex items-center space-x-2 font-bold text-xs">
                   <span class="text-base">{{ idx === 0 ? '🏆' : idx === 1 ? '🥈' : '🥉' }}</span>
