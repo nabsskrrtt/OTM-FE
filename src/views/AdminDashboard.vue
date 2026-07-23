@@ -1056,10 +1056,10 @@ function getOptionSubmitPercentage(option) {
             
             <!-- PIC Dropdowns -->
             <div>
-              <label class="block text-xs font-bold text-slate-600 mb-1.5">PIC Karyawan Tetap</label>
+              <label class="block text-xs font-bold text-paragon-light mb-1.5">PIC Karyawan Tetap</label>
               <select 
                 v-model="sessionForm.pic_karyawan" 
-                class="w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg px-3 py-2.5 outline-none focus:border-paragon-medium"
+                class="w-full bg-dark-surface-hover border border-dark-border text-dark-text text-xs font-semibold rounded-xl px-3 py-2.5 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 cursor-pointer"
               >
                 <option value="" disabled>-- Pilih PIC Karyawan --</option>
                 <option v-for="p in picKaryawanChoices" :key="p.id" :value="p.name">{{ p.name }}</option>
@@ -1067,10 +1067,10 @@ function getOptionSubmitPercentage(option) {
             </div>
             
             <div>
-              <label class="block text-xs font-bold text-slate-600 mb-1.5">PIC Intern</label>
+              <label class="block text-xs font-bold text-paragon-light mb-1.5">PIC Intern</label>
               <select 
                 v-model="sessionForm.pic_intern" 
-                class="w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg px-3 py-2.5 outline-none focus:border-paragon-medium"
+                class="w-full bg-dark-surface-hover border border-dark-border text-dark-text text-xs font-semibold rounded-xl px-3 py-2.5 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 cursor-pointer"
               >
                 <option value="" disabled>-- Pilih PIC Intern --</option>
                 <option v-for="p in picInternChoices" :key="p.id" :value="p.name">{{ p.name }}</option>
@@ -1324,28 +1324,28 @@ function getOptionSubmitPercentage(option) {
           @dragstart="handleDragStart($event, idx)"
           @dragover.prevent
           @drop="handleDrop($event, idx)"
-          class="p-5 border border-slate-100 bg-slate-50/50 hover:bg-slate-50 rounded-xl space-y-4 transition-all cursor-move flex flex-col relative group"
+          class="p-5 border border-dark-border bg-dark-surface-hover hover:bg-dark-surface rounded-2xl space-y-4 transition-all cursor-move flex flex-col relative group"
         >
           <div class="flex justify-between items-start">
             <div class="flex items-start space-x-3">
-              <GripVertical class="w-4 h-4 text-slate-300 mt-1 flex-shrink-0 group-hover:text-slate-400 transition-colors" />
+              <GripVertical class="w-4 h-4 text-dark-border mt-1 flex-shrink-0 group-hover:text-paragon-light/50 transition-colors" />
               <div class="space-y-1">
-                <div class="flex items-center space-x-2 text-[10px] font-black text-paragon-medium uppercase tracking-widest">
+                <div class="flex items-center space-x-2 text-[10px] font-black text-paragon-light uppercase tracking-widest">
                   <span>Urutan #{{ q.sort_order }}</span>
                   <span>•</span>
                   <span>Tipe: {{ q.question_type }}</span>
                   <span>•</span>
                   <span>Waktu: {{ q.time_limit }} Detik</span>
                 </div>
-                <h4 class="font-bold text-sm text-slate-800 leading-snug">{{ q.question_text }}</h4>
+                <h4 class="font-bold text-sm text-dark-text leading-snug">{{ q.question_text }}</h4>
               </div>
             </div>
             
             <div class="flex items-center space-x-2 flex-shrink-0">
-              <button @click.stop="openEditQuestion(q)" class="p-2 text-slate-400 hover:text-paragon-medium bg-white hover:bg-paragon-ice rounded-lg border border-slate-100 shadow-sm transition-all">
+              <button @click.stop="openEditQuestion(q)" class="p-2 text-dark-text-secondary hover:text-paragon-light bg-dark-surface-hover hover:bg-paragon-medium/10 rounded-lg border border-dark-border shadow-sm transition-all">
                 <Edit2 class="w-3.5 h-3.5" />
               </button>
-              <button @click.stop="deleteQuestion(q.id)" class="p-2 text-slate-400 hover:text-red-600 bg-white hover:bg-red-50 rounded-lg border border-slate-100 shadow-sm transition-all">
+              <button @click.stop="deleteQuestion(q.id)" class="p-2 text-dark-text-secondary hover:text-red-400 bg-dark-surface-hover hover:bg-red-500/10 rounded-lg border border-dark-border shadow-sm transition-all hover:border-red-500/30">
                 <Trash2 class="w-3.5 h-3.5" />
               </button>
             </div>
@@ -1356,16 +1356,16 @@ function getOptionSubmitPercentage(option) {
             <div 
               v-for="(o, oIdx) in q.options" 
               :key="oIdx" 
-              class="p-2 border border-slate-200/50 rounded-lg bg-white truncate flex items-center"
-              :class="q.question_type !== 'polling' && o === q.correct_answer ? 'border-emerald-300 bg-emerald-50/30 text-emerald-800 font-extrabold' : 'text-slate-600'"
+              class="p-2 border border-dark-border rounded-lg bg-dark-surface truncate flex items-center"
+              :class="q.question_type !== 'polling' && o === q.correct_answer ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-300 font-extrabold' : 'text-dark-text-secondary'"
             >
-              <span class="inline-flex w-4 h-4 items-center justify-center bg-slate-100 rounded text-[9px] uppercase font-bold mr-2 text-slate-500">{{ String.fromCharCode(65 + oIdx) }}</span>
+              <span class="inline-flex w-4 h-4 items-center justify-center bg-dark-border rounded text-[9px] uppercase font-bold mr-2 text-dark-text-secondary">{{ String.fromCharCode(65 + oIdx) }}</span>
               <span>{{ o }}</span>
             </div>
           </div>
 
           <!-- Answer & Explanation panel -->
-          <div class="p-3 bg-white border border-slate-100 rounded-lg space-y-1.5 text-xs text-slate-600 ml-7">
+          <div class="p-3 bg-dark-surface border border-dark-border rounded-lg space-y-1.5 text-xs text-dark-text-secondary ml-7">
             <div v-if="q.question_type !== 'polling'">Jawaban Benar: <strong class="text-emerald-700 font-extrabold">{{ q.correct_answer }}</strong></div>
             <div v-if="q.explanation">Penjelasan: <span class="font-medium italic text-slate-500">{{ q.explanation }}</span></div>
             <div v-if="q.image_path" class="text-paragon-medium font-semibold flex items-center space-x-1">
@@ -1379,22 +1379,22 @@ function getOptionSubmitPercentage(option) {
     <!-- TAB 3: Participant Manager Panel -->
     <div v-if="activeTab === 'participants'" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- Create Single / Import CSV -->
-      <div class="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-100 shadow-xl space-y-6">
+      <div class="lg:col-span-1 bg-dark-surface p-6 rounded-3xl border border-dark-border shadow-xl space-y-6">
         <!-- Add Participant -->
         <div class="space-y-4">
-          <h3 class="font-extrabold text-base text-paragon-dark border-b border-slate-100 pb-3">Tambah Peserta</h3>
+          <h3 class="font-extrabold text-base text-paragon-light border-b border-dark-border pb-3">Tambah Peserta</h3>
           <div>
-            <label class="block text-xs font-bold text-slate-600 mb-1.5">Nama Karyawan / Intern</label>
+            <label class="block text-xs font-bold text-paragon-light mb-1.5">Nama Karyawan / Intern</label>
             <input 
               v-model="participantForm.name" 
               type="text" 
               placeholder="e.g. Nama Karyawan Baru"
-              class="w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg px-3 py-2.5 outline-none focus:border-paragon-medium"
+              class="w-full bg-dark-surface-hover border border-dark-border text-dark-text text-xs font-semibold rounded-xl px-3 py-2.5 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 placeholder-dark-text-secondary/30"
             />
           </div>
           <button 
             @click="addParticipant" 
-            class="w-full py-2.5 bg-paragon-medium text-white font-bold rounded-xl text-xs hover:bg-paragon-dark shadow transition-all flex items-center justify-center space-x-1"
+            class="w-full py-2.5 bg-paragon-medium hover:bg-paragon-dark text-white font-bold rounded-xl text-xs shadow transition-all flex items-center justify-center space-x-1"
           >
             <Plus class="w-4 h-4" />
             <span>Tambah</span>
@@ -1402,14 +1402,14 @@ function getOptionSubmitPercentage(option) {
         </div>
 
         <!-- Import CSV -->
-        <div class="space-y-4 border-t border-slate-100 pt-6">
-          <h3 class="font-extrabold text-base text-paragon-dark border-b border-slate-100 pb-3 flex items-center justify-between">
+        <div class="space-y-4 border-t border-dark-border pt-6">
+          <h3 class="font-extrabold text-base text-paragon-light border-b border-dark-border pb-3 flex items-center justify-between">
             <span>Ingest Nama dari CSV</span>
-            <Upload class="w-4 h-4 text-paragon-medium" />
+            <Upload class="w-4 h-4 text-paragon-light" />
           </h3>
           
           <div class="space-y-3">
-            <p class="text-[11px] text-slate-400">
+            <p class="text-[11px] text-dark-text-secondary">
               Impor nama karyawan dalam format baris tunggal nama per baris (Plain List/CSV).
             </p>
             <input 
@@ -1417,12 +1417,12 @@ function getOptionSubmitPercentage(option) {
               type="file" 
               accept=".csv,.txt"
               @change="selectCsvFile"
-              class="w-full text-xs file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-paragon-ice file:text-paragon-medium hover:file:bg-paragon-light hover:file:text-paragon-dark file:transition-all cursor-pointer"
+              class="w-full text-xs file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-paragon-medium file:text-white hover:file:bg-paragon-dark file:transition-all cursor-pointer"
             />
             <button 
               @click="handleCsvUpload"
               :disabled="!csvFile || loading"
-              class="w-full py-2.5 bg-paragon-dark text-white font-bold rounded-xl text-xs disabled:opacity-50 transition-all flex items-center justify-center space-x-1"
+              class="w-full py-2.5 bg-paragon-dark hover:bg-paragon-medium text-white font-bold rounded-xl text-xs disabled:opacity-50 transition-all flex items-center justify-center space-x-1"
             >
               <span>Mulai Ingest</span>
             </button>
@@ -1527,41 +1527,41 @@ function getOptionSubmitPercentage(option) {
       </div>
 
       <!-- Report Generation & Reset Data -->
-      <div class="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-100 shadow-xl space-y-6">
+      <div class="lg:col-span-2 bg-dark-surface p-6 rounded-3xl border border-dark-border shadow-xl space-y-6">
         <!-- Downloads Excel -->
         <div class="space-y-4">
-          <h3 class="font-extrabold text-base text-paragon-dark border-b border-slate-100 pb-3 flex items-center justify-between">
+          <h3 class="font-extrabold text-base text-paragon-light border-b border-dark-border pb-3 flex items-center justify-between">
             <span>Ekspor File Laporan (Excel)</span>
-            <FileSpreadsheet class="w-4 h-4 text-emerald-600" />
+            <FileSpreadsheet class="w-4 h-4 text-emerald-400" />
           </h3>
           
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="p-4 border border-slate-100 rounded-2xl bg-slate-50 hover:bg-slate-100/50 space-y-3 flex flex-col justify-between transition-all">
+            <div class="p-4 border border-dark-border rounded-2xl bg-dark-surface-hover hover:border-emerald-500/30 space-y-3 flex flex-col justify-between transition-all">
               <div class="space-y-1">
-                <h4 class="font-black text-sm text-paragon-dark">Laporan Bulanan</h4>
-                <p class="text-[10px] text-slate-500 font-semibold leading-relaxed">
+                <h4 class="font-black text-sm text-paragon-ice">Laporan Bulanan</h4>
+                <p class="text-[10px] text-dark-text-secondary font-semibold leading-relaxed">
                   Mengunduh ringkasan Top 3, statistik akumulatif per peserta, serta detail pengiriman jawaban spesifik untuk bulan <strong>{{ selectedMonth }}</strong>.
                 </p>
               </div>
               <button 
                 @click="downloadMonthlyExcel"
-                class="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow shadow-emerald-600/10 flex items-center justify-center space-x-1"
+                class="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow shadow-emerald-600/20 flex items-center justify-center space-x-1"
               >
                 <FileSpreadsheet class="w-4 h-4" />
                 <span>Unduh Laporan Bulanan</span>
               </button>
             </div>
 
-            <div class="p-4 border border-slate-100 rounded-2xl bg-slate-50 hover:bg-slate-100/50 space-y-3 flex flex-col justify-between transition-all">
+            <div class="p-4 border border-dark-border rounded-2xl bg-dark-surface-hover hover:border-paragon-medium/30 space-y-3 flex flex-col justify-between transition-all">
               <div class="space-y-1">
-                <h4 class="font-black text-sm text-paragon-dark">Laporan Lifetime (Semua Data)</h4>
-                <p class="text-[10px] text-slate-500 font-semibold leading-relaxed">
+                <h4 class="font-black text-sm text-paragon-ice">Laporan Lifetime (Semua Data)</h4>
+                <p class="text-[10px] text-dark-text-secondary font-semibold leading-relaxed">
                   Mengunduh seluruh riwayat database OTM, termasuk semua sesi kuis dari awal pendirian, skor total kumulatif, dan log session.
                 </p>
               </div>
               <button 
                 @click="downloadFullExcel"
-                class="w-full py-2 bg-paragon-dark hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow flex items-center justify-center space-x-1"
+                class="w-full py-2 bg-paragon-medium hover:bg-paragon-dark text-white text-xs font-bold rounded-xl shadow shadow-paragon-medium/20 flex items-center justify-center space-x-1"
               >
                 <FileSpreadsheet class="w-4 h-4" />
                 <span>Unduh Laporan Lifetime</span>
@@ -1571,18 +1571,18 @@ function getOptionSubmitPercentage(option) {
         </div>
 
         <!-- Wipe & Backup module (ESOT protocol) -->
-        <div class="space-y-4 border-t border-slate-100 pt-6">
-          <h3 class="font-extrabold text-base text-red-600 flex items-center space-x-2">
+        <div class="space-y-4 border-t border-dark-border pt-6">
+          <h3 class="font-extrabold text-base text-red-400 flex items-center space-x-2">
             <ShieldAlert class="w-5 h-5" />
             <span>Zona Bahaya: Backup &amp; Reset Sesi</span>
           </h3>
 
-          <div class="p-5 bg-red-50/50 border border-red-100 rounded-2xl space-y-4">
-            <p class="text-xs text-red-800 font-semibold leading-relaxed">
+          <div class="p-5 bg-red-500/10 border border-red-500/30 rounded-2xl space-y-4">
+            <p class="text-xs text-red-300 font-semibold leading-relaxed">
               Protokol <strong>"Backup before Wipe"</strong> wajib dijalankan setiap 6 bulan sekali. 
               Sistem akan menutup koneksi database, menyalin arsip file DB fisik ke direktori <code>BE/backups/</code>, dan kemudian mereset seluruh sesi kuis, daftar pertanyaan, serta perolehan skor peserta untuk memulai siklus reward baru.
             </p>
-            <div class="text-xs font-bold text-red-700">
+            <div class="text-xs font-bold text-red-300">
               * Daftar nama peserta (employee list) tidak akan dihapus agar dropdown tetap berfungsi tanpa re-upload.
             </div>
 
