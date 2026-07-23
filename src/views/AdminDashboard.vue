@@ -983,16 +983,16 @@ function getOptionSubmitPercentage(option) {
 
     <!-- MAIN ADMIN CONTROL PANEL (NORMAL STATE) -->
     <!-- Top Admin Header -->
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between bg-white p-6 rounded-2xl border border-slate-100 shadow-md gap-4">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between bg-dark-surface p-6 rounded-3xl border border-dark-border shadow-lg gap-4">
       <div>
-        <h2 class="text-2xl font-black text-paragon-dark">Dashboard Administrator</h2>
-        <p class="text-xs text-slate-500 font-medium">Own The Morning (OTM) Admin Panel</p>
+        <h2 class="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-paragon-ice to-paragon-light">Dashboard Administrator</h2>
+        <p class="text-xs text-dark-text-secondary font-medium mt-1">OTM Admin Panel</p>
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
         <button 
           @click="handleLogout" 
-          class="px-4 py-2 border border-red-100 hover:bg-red-50 text-red-600 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 shadow-sm"
+          class="px-4 py-2.5 border border-red-500/30 hover:bg-red-500/10 text-red-400 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 shadow-sm hover:border-red-500/50"
         >
           <LogOut class="w-3.5 h-3.5" />
           <span>Keluar</span>
@@ -1001,10 +1001,10 @@ function getOptionSubmitPercentage(option) {
     </div>
 
     <!-- Navigation Tabs -->
-    <div class="flex flex-wrap gap-2 border-b border-slate-200 pb-1">
+    <div class="flex flex-wrap gap-2 border-b border-dark-border pb-1 mt-6">
       <button 
         @click="activeTab = 'control'" 
-        :class="activeTab === 'control' ? 'border-paragon-medium text-paragon-medium font-black bg-paragon-ice' : 'border-transparent text-slate-500 hover:text-slate-700 font-semibold'"
+        :class="activeTab === 'control' ? 'border-paragon-medium text-paragon-ice font-black bg-paragon-medium/10' : 'border-transparent text-dark-text-secondary hover:text-dark-text font-semibold'"
         class="px-4 py-2.5 rounded-xl border text-xs md:text-sm transition-all flex items-center space-x-2"
       >
         <Play class="w-4 h-4" />
@@ -1012,7 +1012,7 @@ function getOptionSubmitPercentage(option) {
       </button>
       <button 
         @click="activeTab = 'questions'" 
-        :class="activeTab === 'questions' ? 'border-paragon-medium text-paragon-medium font-black bg-paragon-ice' : 'border-transparent text-slate-500 hover:text-slate-700 font-semibold'"
+        :class="activeTab === 'questions' ? 'border-paragon-medium text-paragon-ice font-black bg-paragon-medium/10' : 'border-transparent text-dark-text-secondary hover:text-dark-text font-semibold'"
         class="px-4 py-2.5 rounded-xl border text-xs md:text-sm transition-all flex items-center space-x-2"
       >
         <ListCollapse class="w-4 h-4" />
@@ -1020,7 +1020,7 @@ function getOptionSubmitPercentage(option) {
       </button>
       <button 
         @click="activeTab = 'participants'" 
-        :class="activeTab === 'participants' ? 'border-paragon-medium text-paragon-medium font-black bg-paragon-ice' : 'border-transparent text-slate-500 hover:text-slate-700 font-semibold'"
+        :class="activeTab === 'participants' ? 'border-paragon-medium text-paragon-ice font-black bg-paragon-medium/10' : 'border-transparent text-dark-text-secondary hover:text-dark-text font-semibold'"
         class="px-4 py-2.5 rounded-xl border text-xs md:text-sm transition-all flex items-center space-x-2"
       >
         <Users class="w-4 h-4" />
@@ -1028,7 +1028,7 @@ function getOptionSubmitPercentage(option) {
       </button>
       <button 
         @click="activeTab = 'reports'" 
-        :class="activeTab === 'reports' ? 'border-paragon-medium text-paragon-medium font-black bg-paragon-ice' : 'border-transparent text-slate-500 hover:text-slate-700 font-semibold'"
+        :class="activeTab === 'reports' ? 'border-paragon-medium text-paragon-ice font-black bg-paragon-medium/10' : 'border-transparent text-dark-text-secondary hover:text-dark-text font-semibold'"
         class="px-4 py-2.5 rounded-xl border text-xs md:text-sm transition-all flex items-center space-x-2"
       >
         <Award class="w-4 h-4" />
@@ -1041,16 +1041,16 @@ function getOptionSubmitPercentage(option) {
       <!-- Session Creator & Active Session state -->
       <div class="lg:col-span-1 space-y-6">
         <!-- New Session Form -->
-        <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-xl space-y-6">
-          <h3 class="font-extrabold text-base text-paragon-dark border-b border-slate-100 pb-3">Inisialisasi Sesi Baru</h3>
+        <div class="bg-dark-surface p-6 rounded-3xl border border-dark-border shadow-xl space-y-6">
+          <h3 class="font-extrabold text-base text-paragon-light border-b border-dark-border pb-3">Inisialisasi Sesi Baru</h3>
           
           <div class="space-y-4">
             <div>
-              <label class="block text-xs font-bold text-slate-600 mb-1.5">Tanggal Sesi</label>
+              <label class="block text-xs font-bold text-paragon-light mb-1.5">Tanggal Sesi</label>
               <input 
                 v-model="sessionForm.date" 
                 type="date" 
-                class="w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg px-3 py-2.5 outline-none focus:border-paragon-medium"
+                class="w-full bg-dark-surface-hover border border-dark-border text-dark-text text-xs font-semibold rounded-xl px-3 py-2.5 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30"
               />
             </div>
             
@@ -1078,12 +1078,12 @@ function getOptionSubmitPercentage(option) {
             </div>
 
             <div>
-              <label class="block text-xs font-bold text-slate-600 mb-1.5">Parmasys Reference (Tema)</label>
+              <label class="block text-xs font-bold text-paragon-light mb-1.5">PIC Karyawan Tetap</label>
               <input 
-                v-model="sessionForm.reference" 
+                v-model="sessionForm.pic_karyawan" 
                 type="text" 
-                placeholder="e.g. Budaya Ownership ETRM"
-                class="w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg px-3 py-2.5 outline-none focus:border-paragon-medium"
+                placeholder="ex. Mas Ridho"
+                class="w-full bg-dark-surface-hover border border-dark-border text-dark-text text-xs font-semibold rounded-xl px-3 py-2.5 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 placeholder-dark-text-secondary/30"
               />
             </div>
 

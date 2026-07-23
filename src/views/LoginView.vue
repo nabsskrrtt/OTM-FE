@@ -1,7 +1,8 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Award, Play, History, UserCheck, HelpCircle, X } from 'lucide-vue-next'
+import { Award, Play, History, UserCheck, HelpCircle, X, Trophy } from 'lucide-vue-next'
+import AvatarCarousel from '../components/AvatarCarousel.vue'
 
 const router = useRouter()
 const API_HOST = import.meta.env.VITE_API_URL || 'http://localhost:3000'
@@ -235,30 +236,11 @@ onUnmounted(() => {
       </div>
 
       <div class="space-y-6">
-        <!-- Avatar Selection -->
-        <div>
-          <label class="block text-xs font-bold text-paragon-light uppercase tracking-widest mb-4">Pilih Avatar Anda</label>
-          <div class="grid grid-cols-4 gap-3">
-            <button 
-              v-for="avatar in avatarOptions" 
-              :key="avatar.id"
-              @click="selectedAvatarId = avatar.id"
-              class="relative group"
-            >
-              <div 
-                class="w-full aspect-square rounded-2xl flex items-center justify-center text-4xl font-bold transition-all duration-300"
-                :class="selectedAvatarId === avatar.id 
-                  ? 'bg-gradient-to-br from-paragon-medium to-paragon-dark ring-2 ring-paragon-light scale-110 shadow-lg shadow-paragon-medium/50' 
-                  : 'bg-dark-surface-hover border border-dark-border hover:border-paragon-light hover:bg-dark-surface hover:scale-105'"
-              >
-                {{ avatar.emoji }}
-              </div>
-              <span class="text-[10px] font-bold text-dark-text-secondary mt-1 block group-hover:text-paragon-light transition-colors">{{ avatar.name }}</span>
-            </button>
-          </div>
-          <div v-if="!selectedAvatarId" class="text-xs text-red-400 font-semibold mt-3">
-            ⚠️ Pilih avatar terlebih dahulu
-          </div>
+        <!-- Avatar Selection Carousel -->
+        <AvatarCarousel v-model="selectedAvatarId" :avatars="avatarOptions" />
+        
+        <div v-if="!selectedAvatarId" class="text-xs text-red-400 font-semibold">
+          ⚠️ Pilih avatar terlebih dahulu
         </div>
 
         <!-- Participant Selection -->

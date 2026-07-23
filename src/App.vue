@@ -30,17 +30,15 @@ watch(() => route.path, () => {
     <!-- Premium Dark Mode Navbar -->
     <header class="bg-gradient-to-r from-paragon-dark via-paragon-dark to-paragon-medium text-white border-b border-paragon-light/10 shadow-2xl">
       <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-        <div class="flex items-center space-x-4">
+        <div class="flex items-center space-x-3">
           <!-- Logo Container -->
           <div class="relative">
-            <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-paragon-ice to-paragon-light flex items-center justify-center text-paragon-dark font-extrabold text-2xl shadow-lg shadow-paragon-light/20 hover:scale-105 transition-transform">
-              P
-            </div>
-            <div class="absolute -top-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full animate-pulse shadow-lg shadow-emerald-400/50"></div>
+            <img src="/paragon-logo.png" alt="Paragon" class="h-10 w-10 object-contain hover:scale-105 transition-transform" />
+            <div class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full animate-pulse shadow-lg shadow-emerald-400/50"></div>
           </div>
           <div>
-            <h1 class="font-extrabold tracking-wider text-lg md:text-xl uppercase bg-clip-text text-transparent bg-gradient-to-r from-paragon-ice to-white">OTM</h1>
-            <span class="text-[9px] md:text-xs text-paragon-light/60 font-bold tracking-widest">OWN THE MORNING</span>
+            <h1 class="font-extrabold tracking-wider text-base md:text-lg uppercase text-paragon-ice">Paragon OTM</h1>
+            <span class="text-[8px] md:text-[9px] text-paragon-light/50 font-bold tracking-widest">QUIZ SYSTEM</span>
           </div>
         </div>
 

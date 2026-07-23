@@ -353,48 +353,48 @@ onUnmounted(() => {
         </div>
 
         <!-- Podium Top 3 Layout for Temporary Leaderboard -->
-        <div class="grid grid-cols-3 gap-2 items-end pt-4 pb-6 max-w-sm mx-auto">
+        <div class="grid grid-cols-3 gap-3 items-end pt-6 pb-8 max-w-md mx-auto">
           <!-- 2nd Place -->
           <div class="flex flex-col items-center">
-            <div class="text-xs font-bold text-slate-600 truncate w-full max-w-20">{{ leaderboard[1]?.name || 'Peserta' }}</div>
-            <div class="text-[10px] font-black text-paragon-medium">{{ leaderboard[1]?.current_score || 0 }} Pts</div>
-            <div class="w-full bg-slate-100 border border-slate-200/50 rounded-t-xl h-16 flex items-center justify-center mt-2">
-              <span class="text-xl font-extrabold text-slate-400">2</span>
+            <div class="text-xs font-bold text-paragon-light/70 truncate w-full max-w-20 text-center">{{ leaderboard[1]?.name || 'Peserta' }}</div>
+            <div class="text-xs font-black text-paragon-ice mt-1">{{ leaderboard[1]?.current_score || 0 }}⭐</div>
+            <div class="w-full bg-gradient-to-b from-gray-500 to-gray-700 border border-gray-400 rounded-t-2xl h-20 flex items-center justify-center mt-3 shadow-lg relative">
+              <span class="text-3xl font-black text-white">🥈</span>
             </div>
           </div>
           <!-- 1st Place -->
           <div class="flex flex-col items-center">
-            <div class="text-xs font-extrabold text-amber-600 truncate w-full max-w-20">{{ leaderboard[0]?.name || 'Peserta' }}</div>
-            <div class="text-xs font-black text-amber-500">{{ leaderboard[0]?.current_score || 0 }} Pts</div>
-            <div class="w-full bg-amber-50 border border-amber-200 rounded-t-xl h-24 flex items-center justify-center mt-2 relative shadow-md">
-              <span class="text-3xl font-black text-amber-500">1</span>
-              <span class="absolute -top-3 text-lg">👑</span>
+            <div class="text-xs font-extrabold text-amber-300 truncate w-full max-w-20 text-center">{{ leaderboard[0]?.name || 'Peserta' }}</div>
+            <div class="text-sm font-black text-amber-300 mt-1">{{ leaderboard[0]?.current_score || 0 }}⭐</div>
+            <div class="w-full bg-gradient-to-b from-amber-400 to-amber-600 border border-amber-300 rounded-t-2xl h-32 flex items-center justify-center mt-3 relative shadow-2xl shadow-amber-500/50">
+              <span class="text-5xl font-black text-white">🥇</span>
+              <span class="absolute -top-4 text-2xl animate-bounce">👑</span>
             </div>
           </div>
           <!-- 3rd Place -->
           <div class="flex flex-col items-center">
-            <div class="text-xs font-bold text-slate-600 truncate w-full max-w-20">{{ leaderboard[2]?.name || 'Peserta' }}</div>
-            <div class="text-[10px] font-black text-paragon-medium">{{ leaderboard[2]?.current_score || 0 }} Pts</div>
-            <div class="w-full bg-slate-50 border border-slate-100 rounded-t-xl h-12 flex items-center justify-center mt-2">
-              <span class="text-lg font-extrabold text-slate-400">3</span>
+            <div class="text-xs font-bold text-orange-400 truncate w-full max-w-20 text-center">{{ leaderboard[2]?.name || 'Peserta' }}</div>
+            <div class="text-xs font-black text-orange-300 mt-1">{{ leaderboard[2]?.current_score || 0 }}⭐</div>
+            <div class="w-full bg-gradient-to-b from-orange-500 to-orange-700 border border-orange-400 rounded-t-2xl h-16 flex items-center justify-center mt-3 shadow-lg">
+              <span class="text-3xl font-black text-white">🥉</span>
             </div>
           </div>
         </div>
 
         <!-- Rest of the Participants List -->
-        <div v-if="leaderboard.length > 3" class="text-left space-y-2 border-t border-slate-100 pt-4">
-          <h3 class="text-xs font-bold uppercase text-slate-400 mb-3 tracking-widest">Peringkat Lainnya</h3>
-          <div class="space-y-1.5 max-h-40 overflow-y-auto">
+        <div v-if="leaderboard.length > 3" class="text-left space-y-2 border-t border-dark-border pt-6">
+          <h3 class="text-xs font-bold uppercase text-paragon-light/60 mb-4 tracking-widest">Peringkat Lainnya</h3>
+          <div class="space-y-2 max-h-40 overflow-y-auto pr-2">
             <div 
               v-for="(p, idx) in leaderboard.slice(3)" 
               :key="p.id" 
-              class="flex justify-between items-center px-4 py-2 bg-slate-50 rounded-lg text-xs"
+              class="flex justify-between items-center px-4 py-3 bg-dark-surface-hover border border-dark-border rounded-xl text-xs hover:border-paragon-light/30 transition-all"
             >
-              <div class="font-semibold text-slate-700">
-                <span class="text-slate-400 mr-2">#{{ idx + 4 }}</span>
-                <span>{{ p.name }}</span>
+              <div class="font-semibold text-dark-text">
+                <span class="text-paragon-light/50 mr-2">#{{ idx + 4 }}</span>
+                <span class="text-dark-text-secondary">{{ p.name }}</span>
               </div>
-              <div class="font-bold text-paragon-medium">{{ p.current_score }} Pts</div>
+              <div class="font-bold text-paragon-light">{{ p.current_score }}⭐</div>
             </div>
           </div>
         </div>
