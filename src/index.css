@@ -6,12 +6,20 @@
   --color-paragon-light: #8DA9C4;
   --color-paragon-ice: #EEF4F8;
   --color-paragon-blue: #1E3A8A;
+  
+  /* Dark mode colors */
+  --color-dark-bg: #0F172A;
+  --color-dark-surface: #1A2642;
+  --color-dark-surface-hover: #232E52;
+  --color-dark-border: #3A4A6B;
+  --color-dark-text: #E8F0FF;
+  --color-dark-text-secondary: #A8B8D8;
 }
 
 body {
   font-family: 'Inter', sans-serif;
-  background-color: #F8FAFC;
-  color: #0F172A;
+  background-color: #0F172A;
+  color: #E8F0FF;
   margin: 0;
   padding: 0;
 }

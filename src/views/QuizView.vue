@@ -261,21 +261,21 @@ onUnmounted(() => {
     <!-- Inline Fallback Login Selector -->
     <div 
       v-if="showLogin" 
-      class="bg-white rounded-2xl border border-slate-100 shadow-xl p-6 md:p-8 space-y-6"
+      class="bg-dark-surface rounded-3xl border border-dark-border shadow-2xl p-8 md:p-10 space-y-6"
     >
-      <div class="text-center space-y-2">
-        <h2 class="text-2xl font-extrabold text-paragon-dark">Portal Kuis Live</h2>
-        <p class="text-xs text-slate-500 max-w-sm mx-auto">
-          Silakan pilih nama Anda terlebih dahulu untuk langsung masuk ke sesi kuis live yang aktif.
+      <div class="text-center space-y-3">
+        <h2 class="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-paragon-ice to-paragon-light">🎯 Portal Kuis Live</h2>
+        <p class="text-sm text-dark-text-secondary max-w-sm mx-auto leading-relaxed">
+          Pilih nama Anda untuk langsung bergabung ke sesi kuis live yang aktif dan raih poin tertinggi!
         </p>
       </div>
 
       <div class="space-y-4">
         <div>
-          <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Pilih Nama Anda</label>
+          <label class="block text-xs font-bold text-paragon-light uppercase tracking-widest mb-3">Pilih Nama Anda</label>
           <select 
             v-model="selectedParticipantId" 
-            class="w-full bg-slate-50 border border-slate-200 focus:border-paragon-medium text-slate-800 rounded-xl px-4 py-3 text-sm font-medium transition-all outline-none"
+            class="w-full bg-dark-surface-hover border border-dark-border focus:border-paragon-medium text-dark-text rounded-2xl px-4 py-3.5 text-sm font-medium transition-all outline-none cursor-pointer hover:border-paragon-light/30 focus:ring-2 focus:ring-paragon-medium/30"
           >
             <option value="" disabled>-- Pilih Nama Anda --</option>
             <option v-for="p in participantsList" :key="p.id" :value="p.id">
@@ -287,9 +287,9 @@ onUnmounted(() => {
         <button 
           @click="handleJoinSubmit" 
           :disabled="!selectedParticipantId || loading"
-          class="w-full py-3 bg-paragon-medium text-white font-bold rounded-xl shadow-lg hover:bg-paragon-dark active:scale-[0.99] disabled:opacity-50 transition-all flex items-center justify-center"
+          class="w-full py-3.5 bg-gradient-to-r from-paragon-medium to-paragon-dark text-white font-extrabold rounded-2xl shadow-lg shadow-paragon-medium/30 hover:shadow-paragon-dark/40 hover:scale-105 active:scale-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100 disabled:shadow-none transition-all flex items-center justify-center text-base"
         >
-          <span>Mulai Kuis</span>
+          <span>🚀 Mulai Kuis</span>
         </button>
       </div>
     </div>
@@ -299,102 +299,102 @@ onUnmounted(() => {
       <!-- 1. Lobby Waiting Screen (index = -1) -->
       <div 
         v-if="sessionActive && sessionData && (sessionData.status === 'draft' || sessionData.current_question_index === -1)" 
-        class="bg-white rounded-2xl border border-slate-100 shadow-xl p-8 text-center space-y-6"
+        class="bg-dark-surface rounded-3xl border border-dark-border shadow-2xl p-10 text-center space-y-8"
       >
-        <div class="relative w-24 h-24 mx-auto bg-paragon-ice rounded-3xl flex items-center justify-center">
-          <span class="absolute w-20 h-20 border-4 border-paragon-light/30 border-t-paragon-medium rounded-full animate-spin"></span>
-          <Hourglass class="w-8 h-8 text-paragon-medium animate-pulse" />
+        <div class="relative w-28 h-28 mx-auto bg-gradient-to-br from-paragon-medium/20 to-paragon-dark/20 rounded-3xl flex items-center justify-center border border-paragon-light/20">
+          <span class="absolute w-24 h-24 border-4 border-paragon-light/20 border-t-paragon-light rounded-full animate-spin"></span>
+          <Hourglass class="w-10 h-10 text-paragon-light animate-pulse" />
         </div>
 
-        <div class="space-y-2">
-          <h2 class="text-2xl font-black text-paragon-dark">Menunggu PIC Memulai</h2>
-          <p class="text-xs text-slate-500 max-w-sm mx-auto">
-            Sesi live terhubung. Bersiaplah untuk menjawab 5 sampai 10 pertanyaan sharing Parmasys!
+        <div class="space-y-3">
+          <h2 class="text-3xl font-black text-paragon-ice">⏳ Menunggu PIC Memulai</h2>
+          <p class="text-sm text-dark-text-secondary max-w-sm mx-auto leading-relaxed">
+            Sesi live sudah terhubung! Bersiaplah untuk menjawab 5-10 pertanyaan seru dan tunjukkan kemampuanmu! 🚀
           </p>
         </div>
 
         <!-- Realtime Display of Joined Participants -->
-        <div class="space-y-3 pt-4 border-t border-slate-100 text-left">
-          <h3 class="text-xs font-black uppercase text-slate-400 tracking-wider">
-            Peserta Bergabung ({{ joinedParticipants.length }})
+        <div class="space-y-4 pt-6 border-t border-dark-border text-left">
+          <h3 class="text-sm font-black uppercase text-paragon-light tracking-wider">
+            👥 Peserta Bergabung ({{ joinedParticipants.length }})
           </h3>
-          <div v-if="joinedParticipants.length === 0" class="text-slate-400 text-xs font-semibold py-4 text-center border border-dashed border-slate-200 rounded-xl bg-slate-50">
-            Menunggu peserta lain masuk...
+          <div v-if="joinedParticipants.length === 0" class="text-dark-text-secondary text-sm font-semibold py-6 text-center border border-dashed border-dark-border rounded-2xl bg-dark-surface-hover">
+            ⏳ Menunggu peserta lain masuk...
           </div>
-          <div v-else class="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
+          <div v-else class="grid grid-cols-2 gap-2.5 max-h-48 overflow-y-auto pr-2">
             <div 
               v-for="p in joinedParticipants" 
               :key="p.id" 
-              class="px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 truncate text-center"
+              class="px-4 py-3 bg-dark-surface-hover border border-dark-border rounded-2xl text-xs font-bold text-paragon-ice truncate text-center hover:border-paragon-light/30 transition-all"
             >
               {{ p.name }}
             </div>
           </div>
         </div>
 
-        <div class="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-2 text-left text-xs text-slate-600">
-          <div class="flex justify-between"><span>Parmasys Ref:</span> <strong class="text-slate-800">{{ sessionData.reference }}</strong></div>
-          <div class="flex justify-between"><span>PIC Briefing:</span> <strong class="text-slate-800">{{ sessionData.pic_karyawan }} &amp; {{ sessionData.pic_intern }}</strong></div>
-          <div class="flex justify-between"><span>Tanggal Sesi:</span> <strong class="text-slate-800">{{ sessionData.date }}</strong></div>
+        <div class="p-5 rounded-2xl bg-dark-surface-hover border border-dark-border space-y-3 text-left text-xs text-dark-text-secondary">
+          <div class="flex justify-between items-center"><span class="text-paragon-light/60">📋 Parmasys Ref:</span> <strong class="text-paragon-ice">{{ sessionData.reference }}</strong></div>
+          <div class="flex justify-between items-center"><span class="text-paragon-light/60">👥 PIC Briefing:</span> <strong class="text-paragon-ice">{{ sessionData.pic_karyawan }} &amp; {{ sessionData.pic_intern }}</strong></div>
+          <div class="flex justify-between items-center"><span class="text-paragon-light/60">📅 Tanggal:</span> <strong class="text-paragon-ice">{{ sessionData.date }}</strong></div>
         </div>
       </div>
 
       <!-- 1.5. Temporary Leaderboard Screen -->
       <div 
         v-else-if="sessionActive && sessionData && sessionData.status === 'active' && sessionData.show_leaderboard" 
-        class="bg-white rounded-2xl border border-slate-100 shadow-xl p-6 md:p-8 space-y-6 text-center"
+        class="bg-dark-surface rounded-3xl border border-dark-border shadow-2xl p-8 md:p-10 space-y-8 text-center"
       >
-        <div class="space-y-2">
-          <Trophy class="w-12 h-12 text-amber-500 mx-auto animate-bounce" />
-          <h2 class="text-2xl font-black text-paragon-dark">Leaderboard Sementara</h2>
-          <p class="text-xs text-slate-500">
-            Berikut adalah posisi sementara! Bersiaplah untuk pertanyaan berikutnya.
+        <div class="space-y-3">
+          <Trophy class="w-14 h-14 text-amber-400 mx-auto animate-bounce" />
+          <h2 class="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-amber-300 to-amber-200">🏆 Leaderboard Sementara</h2>
+          <p class="text-sm text-dark-text-secondary">
+            Lihat posisi Anda sekarang! Bersiaplah untuk soal berikutnya. ⚡
           </p>
         </div>
 
         <!-- Podium Top 3 Layout for Temporary Leaderboard -->
-        <div class="grid grid-cols-3 gap-2 items-end pt-4 pb-6 max-w-sm mx-auto">
+        <div class="grid grid-cols-3 gap-3 items-end pt-6 pb-8 max-w-md mx-auto">
           <!-- 2nd Place -->
           <div class="flex flex-col items-center">
-            <div class="text-xs font-bold text-slate-600 truncate w-full max-w-20">{{ leaderboard[1]?.name || 'Peserta' }}</div>
-            <div class="text-[10px] font-black text-paragon-medium">{{ leaderboard[1]?.current_score || 0 }} Pts</div>
-            <div class="w-full bg-slate-100 border border-slate-200/50 rounded-t-xl h-16 flex items-center justify-center mt-2">
-              <span class="text-xl font-extrabold text-slate-400">2</span>
+            <div class="text-xs font-bold text-paragon-light/70 truncate w-full max-w-20 text-center">{{ leaderboard[1]?.name || 'Peserta' }}</div>
+            <div class="text-xs font-black text-paragon-ice mt-1">{{ leaderboard[1]?.current_score || 0 }}⭐</div>
+            <div class="w-full bg-gradient-to-b from-gray-500 to-gray-700 border border-gray-400 rounded-t-2xl h-20 flex items-center justify-center mt-3 shadow-lg relative">
+              <span class="text-3xl font-black text-white">🥈</span>
             </div>
           </div>
           <!-- 1st Place -->
           <div class="flex flex-col items-center">
-            <div class="text-xs font-extrabold text-amber-600 truncate w-full max-w-20">{{ leaderboard[0]?.name || 'Peserta' }}</div>
-            <div class="text-xs font-black text-amber-500">{{ leaderboard[0]?.current_score || 0 }} Pts</div>
-            <div class="w-full bg-amber-50 border border-amber-200 rounded-t-xl h-24 flex items-center justify-center mt-2 relative shadow-md">
-              <span class="text-3xl font-black text-amber-500">1</span>
-              <span class="absolute -top-3 text-lg">👑</span>
+            <div class="text-xs font-extrabold text-amber-300 truncate w-full max-w-20 text-center">{{ leaderboard[0]?.name || 'Peserta' }}</div>
+            <div class="text-sm font-black text-amber-300 mt-1">{{ leaderboard[0]?.current_score || 0 }}⭐</div>
+            <div class="w-full bg-gradient-to-b from-amber-400 to-amber-600 border border-amber-300 rounded-t-2xl h-32 flex items-center justify-center mt-3 relative shadow-2xl shadow-amber-500/50">
+              <span class="text-5xl font-black text-white">🥇</span>
+              <span class="absolute -top-4 text-2xl animate-bounce">👑</span>
             </div>
           </div>
           <!-- 3rd Place -->
           <div class="flex flex-col items-center">
-            <div class="text-xs font-bold text-slate-600 truncate w-full max-w-20">{{ leaderboard[2]?.name || 'Peserta' }}</div>
-            <div class="text-[10px] font-black text-paragon-medium">{{ leaderboard[2]?.current_score || 0 }} Pts</div>
-            <div class="w-full bg-slate-50 border border-slate-100 rounded-t-xl h-12 flex items-center justify-center mt-2">
-              <span class="text-lg font-extrabold text-slate-400">3</span>
+            <div class="text-xs font-bold text-orange-400 truncate w-full max-w-20 text-center">{{ leaderboard[2]?.name || 'Peserta' }}</div>
+            <div class="text-xs font-black text-orange-300 mt-1">{{ leaderboard[2]?.current_score || 0 }}⭐</div>
+            <div class="w-full bg-gradient-to-b from-orange-500 to-orange-700 border border-orange-400 rounded-t-2xl h-16 flex items-center justify-center mt-3 shadow-lg">
+              <span class="text-3xl font-black text-white">🥉</span>
             </div>
           </div>
         </div>
 
         <!-- Rest of the Participants List -->
-        <div v-if="leaderboard.length > 3" class="text-left space-y-2 border-t border-slate-100 pt-4">
-          <h3 class="text-xs font-bold uppercase text-slate-400 mb-3 tracking-widest">Peringkat Lainnya</h3>
-          <div class="space-y-1.5 max-h-40 overflow-y-auto">
+        <div v-if="leaderboard.length > 3" class="text-left space-y-2 border-t border-dark-border pt-6">
+          <h3 class="text-xs font-bold uppercase text-paragon-light/60 mb-4 tracking-widest">Peringkat Lainnya</h3>
+          <div class="space-y-2 max-h-40 overflow-y-auto pr-2">
             <div 
               v-for="(p, idx) in leaderboard.slice(3)" 
               :key="p.id" 
-              class="flex justify-between items-center px-4 py-2 bg-slate-50 rounded-lg text-xs"
+              class="flex justify-between items-center px-4 py-3 bg-dark-surface-hover border border-dark-border rounded-xl text-xs hover:border-paragon-light/30 transition-all"
             >
-              <div class="font-semibold text-slate-700">
-                <span class="text-slate-400 mr-2">#{{ idx + 4 }}</span>
-                <span>{{ p.name }}</span>
+              <div class="font-semibold text-dark-text">
+                <span class="text-paragon-light/50 mr-2">#{{ idx + 4 }}</span>
+                <span class="text-dark-text-secondary">{{ p.name }}</span>
               </div>
-              <div class="font-bold text-paragon-medium">{{ p.current_score }} Pts</div>
+              <div class="font-bold text-paragon-light">{{ p.current_score }}⭐</div>
             </div>
           </div>
         </div>

@@ -26,17 +26,19 @@ watch(() => route.path, () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 text-slate-800 antialiased selection:bg-paragon-light/30 selection:text-paragon-dark">
-    <!-- Corporate Top Branding Bar -->
-    <header class="bg-paragon-dark text-white border-b border-white/10 shadow-lg">
+  <div class="min-h-screen bg-dark-bg text-dark-text antialiased selection:bg-paragon-medium/30 selection:text-paragon-ice">
+    <!-- Premium Dark Mode Navbar -->
+    <header class="bg-gradient-to-r from-paragon-dark via-paragon-dark to-paragon-medium text-white border-b border-paragon-light/10 shadow-2xl">
       <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
         <div class="flex items-center space-x-3">
-          <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-paragon-dark font-extrabold text-xl shadow-inner">
-            P
+          <!-- Logo Container -->
+          <div class="relative">
+            <img src="/paragon-logo.png" alt="Paragon" class="h-10 w-10 object-contain hover:scale-105 transition-transform" />
+            <div class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full animate-pulse shadow-lg shadow-emerald-400/50"></div>
           </div>
           <div>
-            <h1 class="font-extrabold tracking-wider text-base md:text-lg uppercase">Paragon ETRM</h1>
-            <span class="text-[10px] md:text-xs text-slate-400 font-medium tracking-wide">OWN THE MORNING SYSTEM</span>
+            <h1 class="font-extrabold tracking-wider text-base md:text-lg uppercase text-paragon-ice">Paragon OTM</h1>
+            <span class="text-[8px] md:text-[9px] text-paragon-light/50 font-bold tracking-widest">QUIZ SYSTEM</span>
           </div>
         </div>
 
@@ -46,25 +48,25 @@ watch(() => route.path, () => {
             <div 
               v-if="loggedInUser" 
               :key="loggedInUser.id"
-              class="flex items-center space-x-2 bg-white/10 px-3.5 py-2 rounded-xl border border-white/5 shadow-inner animate-fade-in"
+              class="flex items-center space-x-2 bg-white/10 backdrop-blur px-4 py-2 rounded-full border border-white/10 shadow-lg hover:bg-white/15 transition-all"
             >
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span class="text-xs font-bold text-slate-200 tracking-wide">{{ loggedInUser.name }}</span>
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span class="text-xs font-bold text-paragon-ice tracking-wide">{{ loggedInUser.name }}</span>
             </div>
             <div 
               v-else-if="isAdmin" 
               key="admin"
-              class="flex items-center space-x-2 bg-white/10 px-3.5 py-2 rounded-xl border border-white/5 shadow-inner animate-fade-in"
+              class="flex items-center space-x-2 bg-white/10 backdrop-blur px-4 py-2 rounded-full border border-white/10 shadow-lg hover:bg-white/15 transition-all"
             >
-              <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-              <span class="text-xs font-bold text-slate-200 tracking-wide">Administrator / PIC</span>
+              <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+              <span class="text-xs font-bold text-paragon-ice tracking-wide">Admin / PIC</span>
             </div>
           </transition>
         </div>
       </div>
     </header>
 
-    <main class="max-w-6xl mx-auto px-4 py-6 md:py-8">
+    <main class="max-w-6xl mx-auto px-4 py-8 md:py-12">
       <RouterView v-slot="{ Component }">
         <transition name="fade" mode="out-in">
           <component :is="Component" />
