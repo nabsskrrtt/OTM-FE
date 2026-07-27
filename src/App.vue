@@ -27,18 +27,18 @@ watch(() => route.path, () => {
 
 <template>
   <div class="min-h-screen bg-dark-bg text-dark-text antialiased selection:bg-paragon-medium/30 selection:text-paragon-ice">
-    <!-- Premium Dark Mode Navbar -->
-    <header class="bg-gradient-to-r from-paragon-dark via-paragon-dark to-paragon-medium text-white border-b border-paragon-light/10 shadow-2xl">
+    <!-- Premium Dark Mode Navbar with Glassmorphism -->
+    <header class="glass sticky top-0 z-50 text-white border-b border-paragon-light/10">
       <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
         <div class="flex items-center space-x-3">
           <!-- Logo Container -->
-          <div class="relative">
-            <img src="/paragon-logo.png" alt="Paragon" class="h-10 w-10 object-contain hover:scale-105 transition-transform" />
-            <div class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full animate-pulse shadow-lg shadow-emerald-400/50"></div>
+          <div class="relative group">
+            <img src="/paragon-corp-logo.png" alt="Paragon" class="h-12 w-auto object-contain hover:scale-110 transition-transform duration-300" />
+            <div class="absolute inset-0 bg-accent-cyan/20 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-lg"></div>
           </div>
           <div>
-            <h1 class="font-extrabold tracking-wider text-base md:text-lg uppercase text-paragon-ice">Paragon OTM</h1>
-            <span class="text-[8px] md:text-[9px] text-paragon-light/50 font-bold tracking-widest">QUIZ SYSTEM</span>
+            <h1 class="font-extrabold tracking-wider text-base md:text-lg bg-clip-text text-transparent bg-gradient-to-r from-paragon-ice via-accent-cyan to-paragon-light">Own The Morning</h1>
+            <span class="text-[8px] md:text-[9px] text-accent-cyan font-bold tracking-widest">ETRM - PARAGON</span>
           </div>
         </div>
 
