@@ -2,22 +2,19 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Award, Play, History, UserCheck, HelpCircle, X, Trophy } from 'lucide-vue-next'
-import AvatarCarousel from '../components/AvatarCarousel.vue'
+import ImmersiveAvatarCarousel from '../components/ImmersiveAvatarCarousel.vue'
 
 const router = useRouter()
 const API_HOST = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 const API_BASE = `${API_HOST}/api`
 
-// Avatar options
+// Avatar options with cute animal images
 const avatarOptions = [
-  { id: 1, emoji: '🦸', name: 'Hero' },
-  { id: 2, emoji: '🚀', name: 'Rocket' },
-  { id: 3, emoji: '⭐', name: 'Star' },
-  { id: 4, emoji: '🎯', name: 'Target' },
-  { id: 5, emoji: '🔥', name: 'Fire' },
-  { id: 6, emoji: '💎', name: 'Diamond' },
-  { id: 7, emoji: '🌟', name: 'Sparkle' },
-  { id: 8, emoji: '⚡', name: 'Lightning' }
+  { id: 1, filename: 'panda.png', name: 'Panda' },
+  { id: 2, filename: 'penguin.png', name: 'Penguin' },
+  { id: 3, filename: 'bee.png', name: 'Bee' },
+  { id: 4, filename: 'monkey.png', name: 'Monkey' },
+  { id: 5, filename: 'fox.png', name: 'Fox' }
 ]
 
 // State
@@ -137,8 +134,13 @@ async function handleLogin() {
     const data = await res.json()
     if (res.ok && data.success) {
       currentParticipant.value = data.participant
-      localStorage.setItem('otm_participant', JSON.stringify(data.participant))
-      localStorage.setItem('otm_selected_avatar', selectedAvatarId.value.toString())
+      const selectedAvatar = avatarOptions.find(a => a.id === selectedAvatarId.value)
+      const participantWithAvatar = {
+        ...data.participant,
+        avatar: selectedAvatar
+      }
+      localStorage.setItem('otm_participant', JSON.stringify(participantWithAvatar))
+      sessionStorage.setItem('otm_avatar', JSON.stringify(selectedAvatar))
       successMsg.value = `Selamat datang, ${data.participant.name}!`
       fetchHistory(data.participant.id)
     } else {
@@ -189,20 +191,19 @@ onMounted(() => {
 
   // Restore session and avatar from localStorage if exists
   const saved = localStorage.getItem('otm_participant')
-  const savedAvatar = localStorage.getItem('otm_selected_avatar')
   if (saved) {
     try {
       const parsed = JSON.parse(saved)
       currentParticipant.value = parsed
       selectedParticipantId.value = parsed.id
+      // Restore avatar from participant data
+      if (parsed.avatar?.id) {
+        selectedAvatarId.value = parsed.avatar.id
+      }
       fetchHistory(parsed.id)
     } catch (e) {
       localStorage.removeItem('otm_participant')
     }
-  }
-  // Restore avatar selection
-  if (savedAvatar) {
-    selectedAvatarId.value = parseInt(savedAvatar)
   }
 })
 
@@ -236,12 +237,8 @@ onUnmounted(() => {
       </div>
 
       <div class="space-y-6">
-        <!-- Avatar Selection Carousel -->
-        <AvatarCarousel v-model="selectedAvatarId" :avatars="avatarOptions" />
-        
-        <div v-if="!selectedAvatarId" class="text-xs text-red-400 font-semibold">
-          ⚠️ Pilih avatar terlebih dahulu
-        </div>
+        <!-- Immersive Avatar Selection Carousel -->
+        <ImmersiveAvatarCarousel v-model="selectedAvatarId" :avatars="avatarOptions" />
 
         <!-- Participant Selection -->
         <div>
@@ -283,8 +280,12 @@ onUnmounted(() => {
       <!-- Profile Welcome Card -->
       <div class="bg-gradient-to-r from-dark-surface-hover to-dark-surface rounded-3xl border border-paragon-light/10 shadow-xl p-6 flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
         <div class="flex items-center space-x-4">
-          <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-paragon-medium to-paragon-dark flex items-center justify-center text-3xl shadow-lg shadow-paragon-medium/30">
-            {{ avatarOptions.find(a => a.id === selectedAvatarId)?.emoji || '🎯' }}
+          <div class="w-16 h-16 rounded-full bg-gradient-to-br from-accent-cyan to-paragon-medium flex items-center justify-center shadow-lg glow-cyan overflow-hidden border-2 border-accent-cyan/50">
+            <img
+              :src="`/assets/avatars/${avatarOptions.find(a => a.id === selectedAvatarId)?.filename}`"
+              :alt="avatarOptions.find(a => a.id === selectedAvatarId)?.name"
+              class="w-full h-full object-cover"
+            />
           </div>
           <div>
             <span class="text-[10px] uppercase font-extrabold tracking-widest text-paragon-light">Masuk Sebagai</span>
