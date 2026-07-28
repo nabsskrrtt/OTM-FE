@@ -65,6 +65,26 @@ class SoundEffects {
     this.play('join-success', 0.7)
   }
 
+  // Play session started
+  sessionStart() {
+    this.play('session-start', 0.8)
+  }
+
+  // Play question transition
+  questionNext() {
+    this.play('question-next', 0.6)
+  }
+
+  // Play button click
+  click() {
+    this.play('click', 0.3)
+  }
+
+  // Play submit action
+  submit() {
+    this.play('submit', 0.7)
+  }
+
   // Play leaderboard background ambience
   leaderboardAmbience() {
     try {
