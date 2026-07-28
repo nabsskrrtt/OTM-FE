@@ -47,11 +47,22 @@ const selectAvatar = (avatarId) => {
 
 const scrollCarousel = (direction) => {
   if (!carouselRef.value) return
+  const carousel = carouselRef.value
   const scrollAmount = 180
-  carouselRef.value.scrollBy({
-    left: direction === 'left' ? -scrollAmount : scrollAmount,
-    behavior: 'smooth'
-  })
+  const maxScroll = carousel.scrollWidth - carousel.clientWidth
+  const newScroll = carousel.scrollLeft + (direction === 'left' ? -scrollAmount : scrollAmount)
+  
+  // Loop around at the edges
+  if (newScroll < 0) {
+    carousel.scrollLeft = maxScroll
+  } else if (newScroll > maxScroll) {
+    carousel.scrollLeft = 0
+  } else {
+    carousel.scrollBy({
+      left: direction === 'left' ? -scrollAmount : scrollAmount,
+      behavior: 'smooth'
+    })
+  }
 }
 </script>
 

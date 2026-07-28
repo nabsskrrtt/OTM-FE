@@ -6,6 +6,7 @@ import {
   Trash2, Upload, FileSpreadsheet, Database, LogOut, Plus, Edit2, Check, X, ShieldAlert,
   Tv, Minimize2, QrCode, GripVertical, Trophy
 } from 'lucide-vue-next'
+import { soundEffects } from '../utils/soundEffects'
 
 const router = useRouter()
 const API_HOST = import.meta.env.VITE_API_URL || 'http://localhost:3000'
@@ -308,6 +309,7 @@ async function createSession() {
     })
     const data = await res.json()
     if (res.ok) {
+      soundEffects.submit()
       successMsg.value = `Sesi baru "${data.reference}" berhasil diinisialisasi!`
       sessionForm.value.reference = ''
       fetchSessions()
@@ -366,15 +368,18 @@ async function deleteSession(id) {
 }
 
 function handleStartSession() {
+  soundEffects.sessionStart()
   updateSessionStatus('active', -1, 0) // Open Waiting lobby
 }
 
 function handleStartQuiz() {
+  soundEffects.sessionStart()
   updateSessionStatus('active', 0, 0) // Start Question 1
 }
 
 function handleNextQuestion() {
   if (!activeSession.value) return
+  soundEffects.questionNext()
   const currentIdx = activeSession.value.current_question_index
   const isShowingLeaderboard = activeSession.value.show_leaderboard === 1 || activeSession.value.show_leaderboard === true
 
@@ -1078,11 +1083,11 @@ function getOptionSubmitPercentage(option) {
             </div>
 
             <div>
-              <label class="block text-xs font-bold text-paragon-light mb-1.5">PIC Karyawan Tetap</label>
+              <label class="block text-xs font-bold text-paragon-light mb-1.5">Parmasys Reference</label>
               <input 
-                v-model="sessionForm.pic_karyawan" 
+                v-model="sessionForm.reference" 
                 type="text" 
-                placeholder="ex. Mas Ridho"
+                placeholder="ex. Sharing Parmasys #42"
                 class="w-full bg-dark-surface-hover border border-dark-border text-dark-text text-xs font-semibold rounded-xl px-3 py-2.5 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 placeholder-dark-text-secondary/30"
               />
             </div>
@@ -1147,49 +1152,43 @@ function getOptionSubmitPercentage(option) {
 
         <!-- No active session state -->
         <div v-if="!activeSession" class="text-center py-10 space-y-3">
-          <p class="text-slate-400 text-sm font-semibold">Belum ada sesi live kuis yang dipilih.</p>
-          <p class="text-[11px] text-slate-400 max-w-sm mx-auto">Silakan pilih salah satu sesi dari list di samping kiri, atau buat sesi baru.</p>
+          <p class="text-dark-text-secondary text-sm font-semibold">Belum ada sesi live kuis yang dipilih.</p>
+          <p class="text-[11px] text-dark-text-secondary max-w-sm mx-auto">Silakan pilih salah satu sesi dari list di samping kiri, atau buat sesi baru.</p>
         </div>
 
         <!-- Active session workspace -->
         <div v-else class="space-y-6">
           <!-- Session details card with Presentation Buttons moved inside -->
-          <div class="p-5 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="p-5 rounded-2xl bg-dark-surface border border-dark-border flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs flex-1">
-              <div><span class="text-slate-400 block mb-0.5">PIC Tetap &amp; Intern</span><strong>{{ activeSession.pic_karyawan }} &amp; {{ activeSession.pic_intern }}</strong></div>
-              <div><span class="text-slate-400 block mb-0.5">Parmasys Reference</span><strong class="truncate block max-w-[150px]">{{ activeSession.reference }}</strong></div>
-              <div><span class="text-slate-400 block mb-0.5">Status Sesi</span><strong class="uppercase text-paragon-medium block">{{ activeSession.status }}</strong></div>
+              <div><span class="text-dark-text-secondary block mb-0.5">PIC Tetap &amp; Intern</span><strong class="text-dark-text">{{ activeSession.pic_karyawan }} &amp; {{ activeSession.pic_intern }}</strong></div>
+              <div><span class="text-dark-text-secondary block mb-0.5">Parmasys Reference</span><strong class="truncate block max-w-[150px] text-dark-text">{{ activeSession.reference }}</strong></div>
+              <div><span class="text-dark-text-secondary block mb-0.5">Status Sesi</span><strong class="uppercase text-paragon-light block">{{ activeSession.status }}</strong></div>
             </div>
 
             <!-- Presentation Trigger Buttons (Grouped on Session Card) -->
             <div class="flex items-center space-x-2 flex-shrink-0">
               <button 
                 @click="showPresentationMode = true"
-                class="px-3.5 py-2.5 bg-slate-900 text-white hover:bg-slate-800 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 shadow-sm"
+                class="px-3.5 py-2.5 bg-paragon-medium hover:bg-paragon-dark text-white rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 shadow-sm"
               >
                 <Tv class="w-3.5 h-3.5" />
                 <span>Layar Presentasi</span>
               </button>
-              <button 
-                @click="openPresentationNewTab"
-                class="px-3.5 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 shadow-sm"
-              >
-                <QrCode class="w-3.5 h-3.5" />
-                <span>Buka Tab Proyektor</span>
-              </button>
+
             </div>
           </div>
 
           <!-- Realtime stats row -->
           <div v-if="liveStats" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="p-4 bg-paragon-ice/50 rounded-xl text-center">
-              <span class="text-[10px] font-extrabold text-slate-400 block uppercase">Peserta Bergabung</span>
-              <strong class="text-xl font-black text-paragon-dark">{{ liveStats.participants?.length || 0 }}</strong>
+            <div class="p-4 bg-dark-surface-hover rounded-xl text-center border border-dark-border">
+              <span class="text-[10px] font-extrabold text-paragon-light block uppercase">Peserta Bergabung</span>
+              <strong class="text-xl font-black text-accent-cyan">{{ liveStats.participants?.length || 0 }}</strong>
             </div>
             
-            <div class="p-4 bg-paragon-ice/50 rounded-xl text-center">
-              <span class="text-[10px] font-extrabold text-slate-400 block uppercase">Indeks Pertanyaan</span>
-              <strong class="text-xl font-black text-paragon-dark">
+            <div class="p-4 bg-dark-surface-hover rounded-xl text-center border border-dark-border">
+              <span class="text-[10px] font-extrabold text-paragon-light block uppercase">Indeks Pertanyaan</span>
+              <strong class="text-xl font-black text-accent-cyan">
                 {{ activeSession.current_question_index === -1 ? 'Lobby / Belum Mulai' : `Soal #${activeSession.current_question_index + 1}` }}
               </strong>
             </div>
