@@ -7,6 +7,7 @@ import {
   Tv, Minimize2, QrCode, GripVertical, Trophy, RotateCcw
 } from 'lucide-vue-next'
 import { soundEffects } from '../utils/soundEffects'
+import ImmersiveLeaderboard from '../components/ImmersiveLeaderboard.vue'
 
 const router = useRouter()
 const API_HOST = import.meta.env.VITE_API_URL || 'http://localhost:3000'
@@ -56,9 +57,35 @@ const monthlyLeaderboard = ref([])
 // Presentation Mode States
 const showPresentationMode = ref(false)
 const presentationTimeLeft = ref(20)
+const presentationTimeLimit = ref(20)
 let presentationTimerInterval = null
 let presentationSyncInterval = null
 let currentQuestionIdForTimer = null
+
+const presentationTimerProgressWidth = computed(() => {
+  if (presentationTimeLimit.value <= 0) return 0
+  return (presentationTimeLeft.value / presentationTimeLimit.value) * 100
+})
+
+const animatedReactionIds = new Set()
+
+function triggerFloatingEmoji(emoji) {
+  const container = document.getElementById('emoji-reactions-container')
+  if (!container) return
+  
+  const el = document.createElement('div')
+  el.innerText = emoji
+  el.className = 'floating-emoji-particle'
+  el.style.left = `${Math.random() * 80 + 10}%` // Random horizontal span (10% to 90%)
+  
+  const duration = 2.5 + Math.random() * 1.5
+  el.style.animationDuration = `${duration}s`
+  
+  container.appendChild(el)
+  setTimeout(() => {
+    el.remove()
+  }, duration * 1000)
+}
 
 const avatarFilenames = {
   1: 'panda.png',
@@ -70,6 +97,14 @@ const avatarFilenames = {
 function getAvatarFileName(participant) {
   if (!participant || !participant.avatar_id) return 'panda.png'
   return avatarFilenames[participant.avatar_id] || 'panda.png'
+}
+
+function getImageUrl(path) {
+  if (!path) return ''
+  if (path.startsWith('http://') || path.startsWith('https://')) return path
+  const host = API_HOST.endsWith('/') ? API_HOST.slice(0, -1) : API_HOST
+  const relative = path.startsWith('/') ? path : '/' + path
+  return `${host}${relative}`
 }
 
 let prevQuestionIndex = null
@@ -243,9 +278,9 @@ const mcqAnswerChoices = computed(() => {
   return questionForm.value.options.filter(o => o.trim() !== '')
 })
 
-// QR Code redirect link points directly to /quiz
+// QR Code redirect link points directly to /quiz (with matching dark theme colors)
 const qrJoinUrl = computed(() => {
-  return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(window.location.origin + '/')}`
+  return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&color=ffffff&bgcolor=0f172a&data=${encodeURIComponent(window.location.origin + '/')}`
 })
 
 const isLastQuestion = computed(() => {
@@ -318,6 +353,19 @@ async function fetchLiveStats() {
     if (res.ok) {
       liveStats.value = await res.json()
       
+      // Process new reactions
+      if (liveStats.value.reactions) {
+        liveStats.value.reactions.forEach(r => {
+          if (!animatedReactionIds.has(r.id)) {
+            animatedReactionIds.add(r.id)
+            triggerFloatingEmoji(r.emoji)
+          }
+        })
+        if (animatedReactionIds.size > 200) {
+          animatedReactionIds.clear()
+        }
+      }
+
       // Sync presentation timer when question index changes
       if (liveStats.value.session_status === 'active' && liveStats.value.submissions) {
         const qId = liveStats.value.submissions.question_id
@@ -353,9 +401,23 @@ async function fetchMonthlyLeaderboard() {
 // Active session polling for presentation tab opened in separate window
 async function fetchActiveSessionForPresentation() {
   try {
-    const res = await fetch(`${API_BASE}/sessions/active`)
+    const res = await fetch(`${API_BASE}/sessions/active?include_finished=true`)
     if (res.ok) {
       const data = await res.json()
+      
+      // Process new reactions
+      if (data.reactions) {
+        data.reactions.forEach(r => {
+          if (!animatedReactionIds.has(r.id)) {
+            animatedReactionIds.add(r.id)
+            triggerFloatingEmoji(r.emoji)
+          }
+        })
+        if (animatedReactionIds.size > 200) {
+          animatedReactionIds.clear()
+        }
+      }
+
       if (data.active) {
         activeSession.value = data.session
         // Fetch questions for this session if empty
@@ -372,24 +434,34 @@ async function fetchActiveSessionForPresentation() {
   }
 }
 
-// Start visual timer countdown inside Presentation mode
+// Start visual timer countdown inside Presentation mode (smooth updates at 100ms)
+let presentationStartTime = null
 function startPresentationTimer(limit) {
   if (presentationTimerInterval) clearInterval(presentationTimerInterval)
+  presentationTimeLimit.value = limit
   presentationTimeLeft.value = limit
+  presentationStartTime = Date.now()
   
+  let lastSoundTime = 0
   presentationTimerInterval = setInterval(() => {
-    presentationTimeLeft.value = Math.max(0, presentationTimeLeft.value - 1)
+    const elapsed = (Date.now() - presentationStartTime) / 1000
+    presentationTimeLeft.value = Math.max(0, limit - elapsed)
+    
     if (presentationTimeLeft.value > 0) {
-      if (presentationTimeLeft.value <= 5) {
-        soundEffects.timerWarning()
-      } else {
-        soundEffects.timerTick()
+      const timeMs = Date.now()
+      if (timeMs - lastSoundTime >= 1000) {
+        if (presentationTimeLeft.value <= 5) {
+          soundEffects.timerWarning()
+        } else {
+          soundEffects.timerTick()
+        }
+        lastSoundTime = timeMs
       }
     } else if (presentationTimeLeft.value <= 0) {
       soundEffects.incorrect()
       clearInterval(presentationTimerInterval)
     }
-  }, 1000)
+  }, 100)
 }
 
 // ----------------------------------------------------
@@ -886,10 +958,12 @@ function getOptionSubmitPercentage(option) {
     <!-- PRESENTATION SCREEN OVERLAY (SCREENSHARE SAFE) -->
     <div 
       v-if="showPresentationMode" 
-      class="fixed inset-0 z-50 bg-slate-950 text-white flex flex-col font-sans overflow-y-auto select-none"
+      class="fixed inset-0 bg-slate-950 text-white z-50 flex flex-col items-center justify-center p-6 md:p-12 overflow-hidden"
     >
+      <!-- Emoji Reactions Overlay Container -->
+      <div id="emoji-reactions-container" class="fixed inset-0 pointer-events-none z-50 overflow-hidden"></div>
       <!-- Presentation Top Bar (Consistent with Main Navbar) -->
-      <div class="bg-slate-900 border-b border-white/5 px-6 py-4 flex items-center justify-between">
+      <div class="bg-slate-900 border-b border-white/5 px-6 py-4 flex items-center justify-between w-full">
         <div class="flex items-center space-x-4">
           <div class="relative group">
             <img src="/paragon-mark.png" alt="Paragon" class="h-10 w-auto object-contain filter brightness-0 invert" />
@@ -924,9 +998,9 @@ function getOptionSubmitPercentage(option) {
           class="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-8 items-center"
         >
           <!-- Left side: Invitation QR Code directly linking to /quiz -->
-          <div class="bg-white text-slate-900 p-8 rounded-3xl shadow-2xl border border-white/10 text-center space-y-6 flex flex-col items-center">
-            <h3 class="text-lg font-black text-slate-800 tracking-tight uppercase">Pindai &amp; Gabung Kuis</h3>
-            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-center shadow-inner">
+          <div class="bg-white text-slate-900 p-8 rounded-3xl shadow-2xl border border-white/10 text-center space-y-6 flex flex-col items-center" style="background-color: #0f172a;">
+            <h3 class="text-lg font-black text-slate-100 tracking-tight uppercase">Pindai &amp; Gabung Kuis</h3>
+            <div class="p-3 bg-[#0f172a] rounded-2xl border border-white/5 flex items-center justify-center shadow-2xl">
               <img :src="qrJoinUrl" alt="QR Join link to /quiz" class="w-60 h-60 object-contain" />
             </div>
             <div class="space-y-1">
@@ -961,9 +1035,12 @@ function getOptionSubmitPercentage(option) {
                 <div 
                   v-for="p in liveStats.participants" 
                   :key="p.id" 
-                  class="px-3.5 py-2.5 bg-white/5 border border-white/5 hover:bg-white/10 rounded-xl text-xs font-bold truncate text-slate-200 transition-all text-center animate-pulse"
+                  class="px-3.5 py-2 bg-white/5 border border-white/5 hover:bg-white/10 rounded-xl text-xs font-bold flex items-center space-x-2.5 text-slate-200 transition-all animate-pulse"
                 >
-                  {{ p.name }}
+                  <div class="w-6 h-6 rounded-full overflow-hidden flex-shrink-0 bg-slate-800 border border-white/10">
+                    <img :src="`/assets/avatars/${getAvatarFileName(p)}`" :alt="p.name" class="w-full h-full object-cover" />
+                  </div>
+                  <span class="truncate">{{ p.name }}</span>
                 </div>
               </div>
             </div>
@@ -983,72 +1060,9 @@ function getOptionSubmitPercentage(option) {
               <p class="text-slate-400 text-sm max-w-md mx-auto">Posisi sementara setelah Soal {{ activeSession.current_question_index + 1 }}!</p>
             </div>
 
-            <!-- Podium Presentation -->
-            <div class="grid grid-cols-3 gap-4 items-end pt-8 max-w-lg mx-auto">
-              <!-- 2nd Place -->
-              <div class="flex flex-col items-center">
-                <div v-if="liveStats?.participants[1]" class="w-12 h-12 rounded-full bg-slate-800 border-2 border-white/20 overflow-hidden shadow-lg mb-2 flex items-center justify-center">
-                  <img 
-                    :src="`/assets/avatars/${getAvatarFileName(liveStats?.participants[1])}`" 
-                    :alt="liveStats?.participants[1]?.name"
-                    class="w-full h-full object-cover"
-                  />
-                </div>
-                <div class="text-sm font-bold text-slate-300 truncate w-full max-w-24">{{ liveStats?.participants[1]?.name || '-' }}</div>
-                <div class="text-xs font-black text-paragon-light">{{ liveStats?.participants[1]?.current_score || 0 }} Pts</div>
-                <div class="w-full bg-slate-900 border border-white/10 rounded-t-2xl h-24 flex items-center justify-center mt-3 shadow-2xl">
-                  <span class="text-3xl font-black text-slate-400">2</span>
-                </div>
-              </div>
-              <!-- 1st Place -->
-              <div class="flex flex-col items-center">
-                <div v-if="liveStats?.participants[0]" class="w-14 h-14 rounded-full bg-amber-500/20 border-2 border-amber-400 overflow-hidden shadow-2xl mb-2 flex items-center justify-center relative">
-                  <img 
-                    :src="`/assets/avatars/${getAvatarFileName(liveStats?.participants[0])}`" 
-                    :alt="liveStats?.participants[0]?.name"
-                    class="w-full h-full object-cover"
-                  />
-                </div>
-                <div class="text-base font-black text-amber-500 truncate w-full max-w-24">{{ liveStats?.participants[0]?.name || '-' }}</div>
-                <div class="text-sm font-black text-amber-400">{{ liveStats?.participants[0]?.current_score || 0 }} Pts</div>
-                <div class="w-full bg-amber-500/10 border border-amber-500/30 rounded-t-2xl h-36 flex items-center justify-center mt-3 relative shadow-2xl">
-                  <span class="text-5xl font-black text-amber-500">1</span>
-                  <span class="absolute -top-6 text-3xl animate-pulse">👑</span>
-                </div>
-              </div>
-              <!-- 3rd Place -->
-              <div class="flex flex-col items-center">
-                <div v-if="liveStats?.participants[2]" class="w-12 h-12 rounded-full bg-slate-800 border-2 border-white/20 overflow-hidden shadow-lg mb-2 flex items-center justify-center">
-                  <img 
-                    :src="`/assets/avatars/${getAvatarFileName(liveStats?.participants[2])}`" 
-                    :alt="liveStats?.participants[2]?.name"
-                    class="w-full h-full object-cover"
-                  />
-                </div>
-                <div class="text-sm font-bold text-slate-300 truncate w-full max-w-24">{{ liveStats?.participants[2]?.name || '-' }}</div>
-                <div class="text-xs font-black text-paragon-light">{{ liveStats?.participants[2]?.current_score || 0 }} Pts</div>
-                <div class="w-full bg-slate-950 border border-white/5 rounded-t-2xl h-16 flex items-center justify-center mt-3 shadow-2xl">
-                  <span class="text-2xl font-black text-slate-500">3</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Rest of the Participants List -->
-            <div v-if="liveStats?.participants && liveStats.participants.length > 3" class="text-left space-y-2 border-t border-white/10 pt-6 max-w-md mx-auto">
-              <h3 class="text-xs font-bold uppercase text-slate-400 mb-3 tracking-widest">Peringkat Lainnya</h3>
-              <div class="space-y-1.5 max-h-40 overflow-y-auto">
-                <div 
-                  v-for="(p, idx) in liveStats.participants.slice(3)" 
-                  :key="p.id" 
-                  class="flex justify-between items-center px-4 py-2 bg-white/5 border border-white/5 rounded-xl text-xs font-bold text-slate-200"
-                >
-                  <div class="truncate max-w-[200px]">
-                    <span class="text-slate-400 mr-2">#{{ idx + 4 }}</span>
-                    <span>{{ p.name }}</span>
-                  </div>
-                  <div class="text-paragon-light flex-shrink-0">{{ p.current_score }} Pts</div>
-                </div>
-              </div>
+            <!-- Immersive Leaderboard (Synchronized styling with participant view) -->
+            <div class="max-w-xl mx-auto text-left">
+              <ImmersiveLeaderboard :leaderboard="liveStats?.participants || []" :currentParticipantId="null" :disableAudio="true" />
             </div>
           </div>
 
@@ -1059,30 +1073,40 @@ function getOptionSubmitPercentage(option) {
               <span class="px-2 py-0.5 bg-white/10 text-white rounded">{{ questions[activeSession.current_question_index]?.points }} Poin</span>
             </div>
 
-            <div class="bg-slate-900 border border-white/5 p-6 md:p-10 rounded-3xl shadow-2xl space-y-6">
-              <!-- Time Indicator (If active) -->
-              <div class="flex justify-between items-center pb-4 border-b border-white/5">
-                <h3 class="text-xl md:text-2xl font-black text-white leading-snug flex-1 mr-4">
-                  {{ questions[activeSession.current_question_index]?.question_text }}
-                </h3>
-
+            <div class="bg-slate-900 border border-white/5 rounded-3xl shadow-2xl overflow-hidden space-y-0">
+              <!-- Presentation Timer Progress Bar -->
+              <div class="h-2 bg-white/5 w-full overflow-hidden">
                 <div 
-                  class="w-16 h-16 rounded-2xl flex flex-col items-center justify-center border font-black text-xl flex-shrink-0"
-                  :class="presentationTimeLeft <= 5 ? 'border-red-500 text-red-500 bg-red-950/20 animate-ping' : 'border-white/20 text-slate-100 bg-white/5'"
-                >
-                  <span>{{ presentationTimeLeft }}</span>
-                  <span class="text-[8px] uppercase tracking-wide opacity-75 leading-none">detik</span>
-                </div>
+                  class="h-full bg-gradient-to-r transition-all duration-100" 
+                  :class="presentationTimeLeft <= 5 ? 'from-red-500 to-red-600 bg-red-500' : 'from-accent-cyan to-paragon-medium bg-paragon-medium shadow-[0_0_8px_rgba(6,182,212,0.5)]'"
+                  :style="{ width: `${presentationTimerProgressWidth}%` }"
+                ></div>
               </div>
 
-              <!-- Optional Question Image -->
-              <div v-if="questions[activeSession.current_question_index]?.image_path" class="w-full rounded-2xl overflow-hidden bg-slate-950 p-4 border border-white/5 max-h-64 flex items-center justify-center">
-                <img 
-                  :src="`${API_HOST}${questions[activeSession.current_question_index]?.image_path}`" 
-                  alt="Presentation context" 
-                  class="max-w-full max-h-60 object-contain"
-                />
-              </div>
+              <div class="p-6 md:p-10 space-y-6">
+                <!-- Time Indicator (If active) -->
+                <div class="flex justify-between items-center pb-4 border-b border-white/5">
+                  <h3 class="text-xl md:text-2xl font-black text-white leading-snug flex-1 mr-4">
+                    {{ questions[activeSession.current_question_index]?.question_text }}
+                  </h3>
+
+                  <div 
+                    class="w-16 h-16 rounded-2xl flex flex-col items-center justify-center border font-black text-xl flex-shrink-0"
+                    :class="Math.ceil(presentationTimeLeft) <= 5 ? 'border-red-500 text-red-500 bg-red-950/20 animate-ping' : 'border-white/20 text-slate-100 bg-white/5'"
+                  >
+                    <span>{{ Math.ceil(presentationTimeLeft) }}</span>
+                    <span class="text-[8px] uppercase tracking-wide opacity-75 leading-none">detik</span>
+                  </div>
+                </div>
+
+                <!-- Optional Question Image -->
+                <div v-if="questions[activeSession.current_question_index]?.image_path" class="w-full rounded-2xl overflow-hidden bg-slate-950 p-4 border border-white/5 max-h-64 flex items-center justify-center">
+                  <img 
+                    :src="getImageUrl(questions[activeSession.current_question_index]?.image_path)" 
+                    alt="Presentation context" 
+                    class="max-w-full max-h-60 object-contain"
+                  />
+                </div>
 
               <!-- Choices Options -->
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1090,7 +1114,7 @@ function getOptionSubmitPercentage(option) {
                   v-for="(o, idx) in questions[activeSession.current_question_index]?.options" 
                   :key="idx"
                   class="p-5 rounded-2xl border transition-all relative overflow-hidden"
-                  :class="presentationTimeLeft === 0 
+                  :class="presentationTimeLeft <= 0 
                     ? (questions[activeSession.current_question_index]?.question_type !== 'polling' && o === questions[activeSession.current_question_index]?.correct_answer ? 'border-emerald-500 bg-emerald-950/30 text-white' : 'border-white/5 bg-slate-950 text-slate-500')
                     : 'border-white/10 bg-white/5 text-slate-100'"
                 >
@@ -1100,14 +1124,14 @@ function getOptionSubmitPercentage(option) {
                       <span>{{ o }}</span>
                     </div>
                     <!-- Percentage count once timer is up -->
-                    <div v-if="presentationTimeLeft === 0" class="text-right flex-shrink-0">
+                    <div v-if="presentationTimeLeft <= 0" class="text-right flex-shrink-0">
                       <span class="text-xs font-black">{{ getOptionSubmitCount(o) }} Peserta ({{ getOptionSubmitPercentage(o) }}%)</span>
                     </div>
                   </div>
 
                   <!-- Submission Bar Background Chart once timer is up -->
                   <div 
-                    v-if="presentationTimeLeft === 0" 
+                    v-if="presentationTimeLeft <= 0" 
                     class="absolute left-0 top-0 bottom-0 transition-all duration-500"
                     :class="questions[activeSession.current_question_index]?.question_type !== 'polling' && o === questions[activeSession.current_question_index]?.correct_answer ? 'bg-emerald-500/10' : 'bg-white/5'"
                     :style="{ width: `${getOptionSubmitPercentage(o)}%` }"
@@ -1117,7 +1141,7 @@ function getOptionSubmitPercentage(option) {
 
               <!-- Explanation feedback area after timer -->
               <div 
-                v-if="presentationTimeLeft === 0 && questions[activeSession.current_question_index]?.explanation" 
+                v-if="presentationTimeLeft <= 0 && questions[activeSession.current_question_index]?.explanation" 
                 class="p-5 bg-white/5 border border-white/5 rounded-2xl space-y-2 animate-fade-in"
               >
                 <h4 class="text-xs font-extrabold uppercase tracking-widest text-paragon-light">Penjelasan Jawaban</h4>
@@ -1135,6 +1159,7 @@ function getOptionSubmitPercentage(option) {
             </div>
           </div>
         </div>
+      </div>
 
         <!-- 3. FINAL RESULTS / PODIUM -->
         <div 
@@ -1147,54 +1172,9 @@ function getOptionSubmitPercentage(option) {
             <p class="text-slate-400 text-sm max-w-md mx-auto">Tepuk tangan untuk skor tertinggi sharing Parmasys minggu ini!</p>
           </div>
 
-          <!-- Podium Presentation -->
-          <div class="grid grid-cols-3 gap-4 items-end pt-8 max-w-lg mx-auto">
-            <!-- 2nd Place -->
-            <div class="flex flex-col items-center">
-              <div v-if="liveStats?.participants[1]" class="w-12 h-12 rounded-full bg-slate-800 border-2 border-white/20 overflow-hidden shadow-lg mb-2 flex items-center justify-center">
-                <img 
-                  :src="`/assets/avatars/${getAvatarFileName(liveStats?.participants[1])}`" 
-                  :alt="liveStats?.participants[1]?.name"
-                  class="w-full h-full object-cover"
-                />
-              </div>
-              <div class="text-sm font-bold text-slate-300 truncate w-full max-w-24">{{ liveStats?.participants[1]?.name || '-' }}</div>
-              <div class="text-xs font-black text-paragon-light">{{ liveStats?.participants[1]?.current_score || 0 }} Pts</div>
-              <div class="w-full bg-slate-900 border border-white/10 rounded-t-2xl h-24 flex items-center justify-center mt-3 shadow-2xl">
-                <span class="text-3xl font-black text-slate-400">2</span>
-              </div>
-            </div>
-            <!-- 1st Place -->
-            <div class="flex flex-col items-center">
-              <div v-if="liveStats?.participants[0]" class="w-14 h-14 rounded-full bg-amber-500/20 border-2 border-amber-400 overflow-hidden shadow-2xl mb-2 flex items-center justify-center relative">
-                <img 
-                  :src="`/assets/avatars/${getAvatarFileName(liveStats?.participants[0])}`" 
-                  :alt="liveStats?.participants[0]?.name"
-                  class="w-full h-full object-cover"
-                />
-              </div>
-              <div class="text-base font-black text-amber-500 truncate w-full max-w-24">{{ liveStats?.participants[0]?.name || '-' }}</div>
-              <div class="text-sm font-black text-amber-400">{{ liveStats?.participants[0]?.current_score || 0 }} Pts</div>
-              <div class="w-full bg-amber-500/10 border border-amber-500/30 rounded-t-2xl h-36 flex items-center justify-center mt-3 relative shadow-2xl">
-                <span class="text-5xl font-black text-amber-500">1</span>
-                <span class="absolute -top-6 text-3xl animate-pulse">👑</span>
-              </div>
-            </div>
-            <!-- 3rd Place -->
-            <div class="flex flex-col items-center">
-              <div v-if="liveStats?.participants[2]" class="w-12 h-12 rounded-full bg-slate-800 border-2 border-white/20 overflow-hidden shadow-lg mb-2 flex items-center justify-center">
-                <img 
-                  :src="`/assets/avatars/${getAvatarFileName(liveStats?.participants[2])}`" 
-                  :alt="liveStats?.participants[2]?.name"
-                  class="w-full h-full object-cover"
-                />
-              </div>
-              <div class="text-sm font-bold text-slate-300 truncate w-full max-w-24">{{ liveStats?.participants[2]?.name || '-' }}</div>
-              <div class="text-xs font-black text-paragon-light">{{ liveStats?.participants[2]?.current_score || 0 }} Pts</div>
-              <div class="w-full bg-slate-950 border border-white/5 rounded-t-2xl h-16 flex items-center justify-center mt-3 shadow-2xl">
-                <span class="text-2xl font-black text-slate-500">3</span>
-              </div>
-            </div>
+          <!-- Immersive Leaderboard (Synchronized styling with participant view) -->
+          <div class="max-w-xl mx-auto text-left">
+            <ImmersiveLeaderboard :leaderboard="liveStats?.participants || []" :currentParticipantId="null" :disableAudio="true" />
           </div>
         </div>
         <!-- Floating Admin control bar -->

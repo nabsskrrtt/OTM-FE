@@ -3,7 +3,11 @@ import { ref, onMounted, onUnmounted, computed } from 'vue'
 
 const props = defineProps({
   leaderboard: Array,
-  currentParticipantId: [Number, String]
+  currentParticipantId: [Number, String],
+  disableAudio: {
+    type: Boolean,
+    default: false
+  }
 })
 
 let leaderboardAudio = null
@@ -39,6 +43,7 @@ import { soundEffects } from '../utils/soundEffects'
 let ambientInstance = null
 
 onMounted(() => {
+  if (props.disableAudio) return
   try {
     ambientInstance = soundEffects.leaderboardAmbience()
   } catch (e) {

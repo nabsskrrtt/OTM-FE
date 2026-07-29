@@ -89,6 +89,35 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Floating Emojis Particle System */
+.floating-emoji-particle {
+  position: absolute;
+  bottom: -50px;
+  font-size: 2.25rem;
+  pointer-events: none;
+  user-select: none;
+  z-index: 9999;
+  animation: floatUpFadeOut linear forwards;
+}
+
+@keyframes floatUpFadeOut {
+  0% {
+    transform: translateY(0) scale(0.6) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+    transform: translateY(-50px) scale(1.25) rotate(8deg);
+  }
+  50% {
+    transform: translateY(-45vh) scale(1) rotate(-12deg);
+  }
+  100% {
+    transform: translateY(-105vh) scale(0.7) rotate(20deg);
+    opacity: 0;
+  }
+}
+
 /* Custom Dark Scrollbar styling */
 ::-webkit-scrollbar {
   width: 8px;

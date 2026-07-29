@@ -293,13 +293,12 @@ onUnmounted(() => {
 
     <!-- Login Selection / Lobby Card -->
     <div v-if="!currentParticipant" class="bg-dark-surface rounded-3xl border border-dark-border shadow-2xl p-8 md:p-10 space-y-6">
-      <div class="text-center space-y-3">
-        <div class="mx-auto w-14 h-14 bg-gradient-to-br from-paragon-medium to-paragon-dark flex items-center justify-center rounded-2xl shadow-lg shadow-paragon-medium/30">
-          <UserCheck class="w-7 h-7 text-paragon-ice" />
-        </div>
-        <h2 class="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-paragon-ice to-paragon-light">Portal Peserta</h2>
-        <p class="text-sm text-dark-text-secondary max-w-sm mx-auto leading-relaxed">
-          Pilih avatar dan nama Anda untuk bergabung ke live kuis seru dan lihat riwayat skor Anda!
+      <div class="text-center space-y-3 py-2">
+        <h2 class="text-3xl font-black">
+          <span class="bg-clip-text text-transparent bg-gradient-to-r from-accent-cyan via-paragon-light to-paragon-medium">Selamat Pagi!</span> ☀️
+        </h2>
+        <p class="text-sm text-dark-text-secondary max-w-sm mx-auto leading-relaxed font-semibold bg-clip-text text-transparent bg-gradient-to-r from-slate-200 to-slate-400">
+          Silakan pilih avatar dan nama Anda untuk bersiap mengikuti sharing morning briefing hari ini!
         </p>
       </div>
 
@@ -349,8 +348,8 @@ onUnmounted(() => {
         <div class="flex items-center space-x-4">
           <div class="w-16 h-16 rounded-full bg-gradient-to-br from-accent-cyan to-paragon-medium flex items-center justify-center shadow-lg glow-cyan overflow-hidden border-2 border-accent-cyan/50">
             <img
-              :src="`/assets/avatars/${avatarOptions.find(a => a.id === selectedAvatarId)?.filename}`"
-              :alt="avatarOptions.find(a => a.id === selectedAvatarId)?.name"
+              :src="selectedAvatarId ? `/assets/avatars/${avatarOptions.find(a => a.id === selectedAvatarId)?.filename || 'panda.png'}` : '/assets/avatars/panda.png'"
+              :alt="avatarOptions.find(a => a.id === selectedAvatarId)?.name || 'Avatar'"
               class="w-full h-full object-cover"
             />
           </div>

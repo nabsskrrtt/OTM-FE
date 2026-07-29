@@ -11,6 +11,26 @@ const API_HOST = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 const API_BASE = `${API_HOST}/api`
 const { triggerCorrectFeedback, triggerIncorrectFeedback } = useImmersiveUI()
 
+const avatarFilenames = {
+  1: 'panda.png',
+  2: 'penguin.png',
+  3: 'bee.png',
+  4: 'monkey.png',
+  5: 'fox.png'
+}
+function getAvatarFileName(participant) {
+  if (!participant || !participant.avatar_id) return 'panda.png'
+  return avatarFilenames[participant.avatar_id] || 'panda.png'
+}
+
+function getImageUrl(path) {
+  if (!path) return ''
+  if (path.startsWith('http://') || path.startsWith('https://')) return path
+  const host = API_HOST.endsWith('/') ? API_HOST.slice(0, -1) : API_HOST
+  const relative = path.startsWith('/') ? path : '/' + path
+  return `${host}${relative}`
+}
+
 // Participant info with avatar
 const participant = ref(null)
 const participantAvatar = ref(null)
@@ -40,16 +60,63 @@ const timerProgressWidth = computed(() => {
   return (timeLeft.value / limit) * 100
 })
 
+const animatedReactionIds = new Set()
+
+function triggerFloatingEmoji(emoji) {
+  const container = document.getElementById('emoji-reactions-container')
+  if (!container) return
+  
+  const el = document.createElement('div')
+  el.innerText = emoji
+  el.className = 'floating-emoji-particle'
+  el.style.left = `${Math.random() * 80 + 10}%` // Random horizontal span (10% to 90%)
+  
+  const duration = 2.5 + Math.random() * 1.5
+  el.style.animationDuration = `${duration}s`
+  
+  container.appendChild(el)
+  setTimeout(() => {
+    el.remove()
+  }, duration * 1000)
+}
+
+async function sendReaction(emoji) {
+  triggerFloatingEmoji(emoji) // instant local feedback for sender
+  try {
+    await fetch(`${API_BASE}/sessions/active/reaction`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ emoji })
+    })
+  } catch (err) {
+    console.error("Gagal mengirim reaction:", err)
+  }
+}
+
 // Check session state and poll
 async function fetchActiveSession() {
   try {
     const url = participant.value
-      ? `${API_BASE}/sessions/active?participant_id=${participant.value.id}`
-      : `${API_BASE}/sessions/active`
+      ? `${API_BASE}/sessions/active?participant_id=${participant.value.id}&include_finished=true`
+      : `${API_BASE}/sessions/active?include_finished=true`
     const res = await fetch(url)
     if (!res.ok) return
 
     const data = await res.json()
+    
+    // Process new reactions
+    if (data.reactions) {
+      data.reactions.forEach(r => {
+        if (!animatedReactionIds.has(r.id)) {
+          animatedReactionIds.add(r.id)
+          triggerFloatingEmoji(r.emoji)
+        }
+      })
+      if (animatedReactionIds.size > 200) {
+        animatedReactionIds.clear()
+      }
+    }
+
     if (!data.active) {
       // Session ended or does not exist
       sessionActive.value = false
@@ -79,15 +146,29 @@ async function fetchActiveSession() {
         currentQuestion.value = newQ
         shortAnswerInput.value = ''
         
-        // Restore feedback if already answered
-        const savedFeedback = answersSubmitted.value[newQ.id]
-        if (savedFeedback) {
-          feedback.value = savedFeedback
-          if (timerInterval) clearInterval(timerInterval);
-          timeLeft.value = 0
+        // Prioritize server feedback state
+        if (data.feedback) {
+          feedback.value = data.feedback
+          startQuestionTimer(newQ.time_limit)
         } else {
+          // Fall back to tab cache
+          const savedFeedback = answersSubmitted.value[newQ.id]
+          if (savedFeedback) {
+            feedback.value = savedFeedback
+            startQuestionTimer(newQ.time_limit)
+          } else {
+            feedback.value = null
+            // Start timer
+            startQuestionTimer(newQ.time_limit)
+          }
+        }
+      } else {
+        // If we are on the same question, sync if feedback state changed (e.g. server reset or completed from elsewhere)
+        if (data.feedback && !feedback.value) {
+          feedback.value = data.feedback
+        } else if (!data.feedback && feedback.value) {
+          // If server says no feedback, but we have it locally (e.g. session reset)
           feedback.value = null
-          // Start timer
           startQuestionTimer(newQ.time_limit)
         }
       }
@@ -147,8 +228,10 @@ function startQuestionTimer(limit) {
     
     if (timeLeft.value <= 0) {
       clearInterval(timerInterval)
-      // Auto-submit as AFK / Timeout
-      submitAnswer("__TIMEOUT__")
+      // Auto-submit as AFK / Timeout only if they haven't answered yet
+      if (!feedback.value) {
+        submitAnswer("__TIMEOUT__")
+      }
     }
   }, 100)
 }
@@ -156,7 +239,6 @@ function startQuestionTimer(limit) {
 // Submit participant answer
 async function submitAnswer(answerText) {
   if (!currentQuestion.value || feedback.value) return
-  if (timerInterval) clearInterval(timerInterval)
 
   const timeLimit = currentQuestion.value.time_limit || 20
   let timeTaken = 0
@@ -361,13 +443,16 @@ onUnmounted(() => {
           <div v-if="joinedParticipants.length === 0" class="text-dark-text-secondary text-sm font-semibold py-6 text-center border border-dashed border-dark-border rounded-2xl bg-dark-surface-hover">
             ⏳ Menunggu peserta lain masuk...
           </div>
-          <div v-else class="grid grid-cols-2 gap-2.5 max-h-48 overflow-y-auto pr-2">
+          <div class="grid grid-cols-2 gap-2.5 max-h-48 overflow-y-auto pr-2">
             <div 
               v-for="p in joinedParticipants" 
               :key="p.id" 
-              class="px-4 py-3 bg-dark-surface-hover border border-dark-border rounded-2xl text-xs font-bold text-paragon-ice truncate text-center hover:border-paragon-light/30 transition-all"
+              class="px-4 py-2.5 bg-dark-surface-hover border border-dark-border rounded-2xl text-xs font-bold text-paragon-ice flex items-center space-x-2.5 hover:border-paragon-light/30 transition-all"
             >
-              {{ p.name }}
+              <div class="w-6 h-6 rounded-full overflow-hidden flex-shrink-0 bg-dark-surface border border-white/10">
+                <img :src="`/assets/avatars/${getAvatarFileName(p)}`" :alt="p.name" class="w-full h-full object-cover" />
+              </div>
+              <span class="truncate">{{ p.name }}</span>
             </div>
           </div>
         </div>
@@ -403,6 +488,9 @@ onUnmounted(() => {
 
     <!-- 2. Question View Screen -->
     <div v-else-if="sessionActive && currentQuestion" class="space-y-4">
+      <!-- Emoji Reactions Overlay Container -->
+      <div id="emoji-reactions-container" class="fixed inset-0 pointer-events-none z-50 overflow-hidden"></div>
+
       <!-- Session Bar -->
       <div class="flex items-center justify-between text-xs font-extrabold text-slate-400 uppercase tracking-widest px-1">
         <span>Soal {{ (sessionData?.current_question_index || 0) + 1 }} dari {{ sessionData?.total_questions || 5 }}</span>
@@ -410,39 +498,39 @@ onUnmounted(() => {
       </div>
 
       <!-- Question Card -->
-      <div class="bg-white rounded-2xl border border-slate-100 shadow-xl overflow-hidden">
+      <div class="bg-dark-surface rounded-2xl border border-dark-border shadow-2xl overflow-hidden">
         <!-- Timer Bar -->
-        <div class="h-2 bg-slate-100 w-full overflow-hidden">
+        <div class="h-2 bg-white/5 w-full overflow-hidden">
           <div 
             class="h-full bg-gradient-to-r transition-all duration-100" 
-            :class="timeLeft <= 5 ? 'from-red-500 to-red-600 bg-red-500' : 'from-paragon-light to-paragon-medium bg-paragon-medium'"
+            :class="timeLeft <= 5 ? 'from-red-500 to-red-600 bg-red-500' : 'from-accent-cyan to-paragon-medium bg-paragon-medium shadow-[0_0_8px_rgba(6,182,212,0.5)]'"
             :style="{ width: `${timerProgressWidth}%` }"
           ></div>
         </div>
 
         <div class="p-6 md:p-8 space-y-6">
           <!-- Question Image if available -->
-          <div v-if="currentQuestion.image_path" class="w-full rounded-xl overflow-hidden bg-slate-50 border border-slate-100">
+          <div v-if="currentQuestion.image_path" class="w-full rounded-xl overflow-hidden bg-slate-950 p-4 border border-white/5 max-h-64 flex items-center justify-center">
             <img 
-              :src="`${API_HOST}${currentQuestion.image_path}`" 
+              :src="getImageUrl(currentQuestion.image_path)" 
               alt="Context illustration" 
-              class="w-full h-auto max-h-60 object-contain mx-auto"
+              class="max-w-full h-auto max-h-60 object-contain mx-auto"
             />
           </div>
 
           <!-- Question Text + Countdown Circle/Box -->
           <div class="flex justify-between items-start gap-4">
-            <h2 class="text-lg md:text-xl font-black text-paragon-dark leading-snug flex-1">
+            <h2 class="text-lg md:text-xl font-black text-paragon-ice leading-snug flex-1">
               {{ currentQuestion.question_text }}
             </h2>
 
             <!-- Numerical Countdown Box -->
             <div 
-              v-if="!feedback && timeLeft > 0"
+              v-if="timeLeft > 0"
               class="w-14 h-14 rounded-2xl flex flex-col items-center justify-center border font-black text-lg flex-shrink-0 transition-all duration-300 shadow-sm"
               :class="timeLeft <= 5 
-                ? 'border-red-500 text-red-500 bg-red-50 animate-bounce scale-110' 
-                : 'border-slate-200 text-slate-700 bg-slate-50'"
+                ? 'border-red-500/40 text-red-400 bg-red-950/20 animate-bounce scale-110' 
+                : 'border-dark-border text-slate-300 bg-dark-surface-hover'"
             >
               <span>{{ Math.ceil(timeLeft) }}</span>
               <span class="text-[8px] uppercase tracking-wider opacity-75 leading-none mt-0.5">detik</span>
@@ -458,9 +546,24 @@ onUnmounted(() => {
                 :key="idx"
                 @click="submitAnswer(opt)"
                 :disabled="loading"
-                class="w-full text-left p-4 rounded-xl border border-slate-200 hover:border-paragon-medium hover:bg-paragon-ice/30 active:scale-[0.98] transition-all text-sm font-bold text-slate-700 disabled:opacity-50"
+                class="w-full text-left p-5 rounded-2xl border-2 text-sm font-extrabold active:scale-[0.98] transition-all duration-200 disabled:opacity-50"
+                :class="[
+                  idx === 0 ? 'border-red-500 text-white bg-red-500/10 hover:bg-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.35)]' : '',
+                  idx === 1 ? 'border-sky-500 text-white bg-sky-500/10 hover:bg-sky-500/20 shadow-[0_0_20px_rgba(14,165,233,0.35)]' : '',
+                  idx === 2 ? 'border-amber-400 text-white bg-amber-400/10 hover:bg-amber-400/20 shadow-[0_0_20px_rgba(251,191,36,0.35)]' : '',
+                  idx === 3 ? 'border-emerald-400 text-white bg-emerald-400/10 hover:bg-emerald-400/20 shadow-[0_0_20px_rgba(52,211,153,0.35)]' : ''
+                ]"
               >
-                <span class="inline-flex w-6 h-6 items-center justify-center bg-slate-100 rounded-lg text-slate-500 mr-3 text-xs uppercase">{{ String.fromCharCode(65 + idx) }}</span>
+                <span class="inline-flex w-6 h-6 items-center justify-center rounded-lg text-white mr-3 text-xs uppercase"
+                  :class="[
+                    idx === 0 ? 'bg-red-500/25 text-white border border-red-500/40' : '',
+                    idx === 1 ? 'bg-sky-500/25 text-white border border-sky-500/40' : '',
+                    idx === 2 ? 'bg-amber-500/25 text-white border border-amber-500/40' : '',
+                    idx === 3 ? 'bg-emerald-500/25 text-white border border-emerald-500/40' : ''
+                  ]"
+                >
+                  {{ String.fromCharCode(65 + idx) }}
+                </span>
                 <span>{{ opt }}</span>
               </button>
             </div>
@@ -470,14 +573,14 @@ onUnmounted(() => {
               <button 
                 @click="submitAnswer('True')" 
                 :disabled="loading"
-                class="py-5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 hover:border-emerald-300 rounded-xl text-emerald-800 font-extrabold text-lg active:scale-95 transition-all text-center"
+                class="py-5 border-2 rounded-2xl font-black text-lg active:scale-95 transition-all text-center border-emerald-400 text-white bg-emerald-400/10 hover:bg-emerald-400/20 shadow-[0_0_20px_rgba(52,211,153,0.35)]"
               >
                 BENAR (True)
               </button>
               <button 
                 @click="submitAnswer('False')" 
                 :disabled="loading"
-                class="py-5 bg-red-50 hover:bg-red-100 border border-red-200 hover:border-red-300 rounded-xl text-red-800 font-extrabold text-lg active:scale-95 transition-all text-center"
+                class="py-5 border-2 rounded-2xl font-black text-lg active:scale-95 transition-all text-center border-red-500 text-white bg-red-500/10 hover:bg-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.35)]"
               >
                 SALAH (False)
               </button>
@@ -490,7 +593,7 @@ onUnmounted(() => {
                 type="text" 
                 placeholder="Ketik jawaban Anda..."
                 :disabled="loading"
-                class="flex-1 bg-slate-50 border border-slate-200 focus:border-paragon-medium focus:bg-white text-slate-800 rounded-xl px-4 py-3 text-sm font-semibold outline-none"
+                class="flex-1 bg-dark-surface-hover border border-dark-border focus:border-paragon-medium focus:bg-dark-surface text-dark-text rounded-xl px-4 py-3 text-sm font-semibold outline-none transition-all"
                 @keyup.enter="submitAnswer(shortAnswerInput)"
               />
               <button 
@@ -509,20 +612,46 @@ onUnmounted(() => {
                 :key="idx"
                 @click="submitAnswer(opt)"
                 :disabled="loading"
-                class="w-full text-left p-4 rounded-xl border border-slate-200 hover:border-paragon-medium hover:bg-paragon-ice/30 active:scale-[0.98] transition-all text-sm font-bold text-slate-700"
+                class="w-full text-left p-5 rounded-2xl border-2 text-sm font-extrabold active:scale-[0.98] transition-all duration-200 disabled:opacity-50"
+                :class="[
+                  idx === 0 ? 'border-red-500 text-white bg-red-500/10 hover:bg-red-500/20' : '',
+                  idx === 1 ? 'border-sky-500 text-white bg-sky-500/10 hover:bg-sky-500/20' : '',
+                  idx === 2 ? 'border-amber-400 text-white bg-amber-400/10 hover:bg-amber-400/20' : '',
+                  idx === 3 ? 'border-emerald-400 text-white bg-emerald-400/10 hover:bg-emerald-400/20' : ''
+                ]"
               >
                 <span>{{ opt }}</span>
               </button>
             </div>
           </div>
 
+          <!-- Waiting for Timer to Finish Screen (once answered, but timer is still ticking) -->
+          <div v-else-if="timeLeft > 0" class="space-y-6 pt-4 border-t border-dark-border text-center">
+            <div class="flex flex-col items-center justify-center p-6 bg-cyan-950/20 border border-cyan-500/30 text-cyan-200 rounded-xl space-y-3 shadow-[0_0_15px_rgba(6,182,212,0.15)] animate-pulse">
+              <span class="text-3xl">🚀</span>
+              <h4 class="font-extrabold text-base leading-tight">Jawaban Terkirim!</h4>
+              <p class="text-xs font-semibold opacity-90">
+                Menunggu waktu menjawab habis dan peserta lainnya...
+              </p>
+            </div>
+            
+            <div class="text-xs font-bold text-slate-400 space-y-1">
+              <div>Pilihan Anda: <span class="text-paragon-ice">{{ feedback.selected_answer }}</span></div>
+            </div>
+
+            <!-- Tiny ticking indicator -->
+            <div class="text-center py-2 space-y-1">
+              <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Sisa Waktu: {{ Math.ceil(timeLeft) }} detik</p>
+            </div>
+          </div>
+
           <!-- Feedback & Explanation Card (shown once submitted) -->
-          <div v-else class="space-y-6 pt-4 border-t border-slate-100">
+          <div v-else class="space-y-6 pt-4 border-t border-dark-border">
             <!-- Correct / Incorrect Header banner -->
             <div 
               v-if="currentQuestion.question_type !== 'polling'"
-              class="flex items-center space-x-3 p-4 rounded-xl border shadow-inner"
-              :class="feedback.is_correct ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'"
+              class="flex items-center space-x-3 p-4 rounded-xl border"
+              :class="feedback.is_correct ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-200' : 'bg-red-950/20 border-red-500/30 text-red-200'"
             >
               <CheckCircle2 v-if="feedback.is_correct" class="w-8 h-8 text-emerald-500 flex-shrink-0" />
               <XCircle v-else class="w-8 h-8 text-red-500 flex-shrink-0" />
@@ -539,7 +668,7 @@ onUnmounted(() => {
             <!-- Polling acknowledgement -->
             <div 
               v-else 
-              class="flex items-center space-x-3 p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl"
+              class="flex items-center space-x-3 p-4 bg-emerald-950/20 border border-emerald-500/30 text-emerald-200 rounded-xl"
             >
               <CheckCircle2 class="w-8 h-8 text-emerald-500 flex-shrink-0" />
               <div>
@@ -551,23 +680,23 @@ onUnmounted(() => {
             </div>
 
             <!-- Submissions Details -->
-            <div class="text-xs font-bold text-slate-500 space-y-1">
-              <div>Jawaban Anda: <span class="text-slate-800">{{ feedback.selected_answer }}</span></div>
-              <div v-if="currentQuestion.question_type !== 'polling'">Jawaban Benar: <span class="text-emerald-600 font-extrabold">{{ feedback.correct_answer }}</span></div>
+            <div class="text-xs font-bold text-slate-400 space-y-1">
+              <div>Jawaban Anda: <span class="text-paragon-ice">{{ feedback.selected_answer }}</span></div>
+              <div v-if="currentQuestion.question_type !== 'polling'">Jawaban Benar: <span class="text-emerald-400 font-extrabold">{{ feedback.correct_answer }}</span></div>
             </div>
 
             <!-- Explanation Card (Penjelasan Field) -->
-            <div v-if="feedback.explanation" class="p-5 bg-paragon-ice/50 border border-paragon-light/10 rounded-xl space-y-2">
-              <span class="text-[10px] font-black text-paragon-medium uppercase tracking-widest">Penjelasan Sharing</span>
-              <p class="text-xs md:text-sm font-semibold text-slate-700 leading-relaxed">
+            <div v-if="feedback.explanation" class="p-5 bg-dark-surface-hover border border-dark-border rounded-xl space-y-2">
+              <span class="text-[10px] font-black text-paragon-light uppercase tracking-widest">Penjelasan Sharing</span>
+              <p class="text-xs md:text-sm font-semibold text-slate-300 leading-relaxed">
                 {{ feedback.explanation }}
               </p>
             </div>
 
             <!-- Lobby Spinner -->
-            <div class="text-center py-4 space-y-2 border-t border-slate-100">
-              <span class="inline-block w-5 h-5 border-2 border-slate-200 border-t-paragon-medium rounded-full animate-spin"></span>
-              <p class="text-xs text-slate-500 font-bold">Menunggu admin melanjutkan ke pertanyaan berikutnya...</p>
+            <div class="text-center py-4 space-y-2 border-t border-dark-border">
+              <span class="inline-block w-5 h-5 border-2 border-slate-700 border-t-paragon-light rounded-full animate-spin"></span>
+              <p class="text-xs text-slate-400 font-bold">Menunggu admin melanjutkan ke pertanyaan berikutnya...</p>
             </div>
           </div>
         </div>
@@ -620,5 +749,17 @@ onUnmounted(() => {
       </div>
     </div>
     </template>
+  </div>
+
+  <!-- Floating Reactions Toolbar -->
+  <div v-if="sessionActive && participant" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900/90 backdrop-blur border border-white/10 px-4 py-2.5 rounded-full flex items-center gap-3.5 shadow-2xl transition-all duration-300">
+    <button 
+      v-for="emo in ['☝️', '🔥', '😎', '🤣', '🤯']" 
+      :key="emo"
+      @click="sendReaction(emo)"
+      class="text-2xl hover:scale-130 active:scale-90 transition-transform duration-150 cursor-pointer select-none"
+    >
+      {{ emo }}
+    </button>
   </div>
 </template>
