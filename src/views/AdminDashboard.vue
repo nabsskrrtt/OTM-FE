@@ -1,10 +1,10 @@
 <script setup>
-import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, computed, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { 
   Play, FastForward, Users, ListCollapse, Award, 
   Trash2, Upload, FileSpreadsheet, Database, LogOut, Plus, Edit2, Check, X, ShieldAlert,
-  Tv, Minimize2, QrCode, GripVertical, Trophy
+  Tv, Minimize2, QrCode, GripVertical, Trophy, RotateCcw
 } from 'lucide-vue-next'
 import { soundEffects } from '../utils/soundEffects'
 
@@ -60,6 +60,87 @@ let presentationTimerInterval = null
 let presentationSyncInterval = null
 let currentQuestionIdForTimer = null
 
+const avatarFilenames = {
+  1: 'panda.png',
+  2: 'penguin.png',
+  3: 'bee.png',
+  4: 'monkey.png',
+  5: 'fox.png'
+}
+function getAvatarFileName(participant) {
+  if (!participant || !participant.avatar_id) return 'panda.png'
+  return avatarFilenames[participant.avatar_id] || 'panda.png'
+}
+
+let prevQuestionIndex = null
+let prevShowLeaderboard = null
+let prevSessionStatus = null
+let ambientAudioInstance = null
+
+function syncPresentationAudioState(session) {
+  if (!session) return
+  const currentIdx = session.current_question_index
+  const currentShowLeaderboard = session.show_leaderboard === 1 || session.show_leaderboard === true
+  const currentStatus = session.status
+
+  // Start of quiz
+  if (prevSessionStatus && prevSessionStatus !== 'active' && currentStatus === 'active' && currentIdx === -1) {
+    soundEffects.sessionStart()
+  }
+  // Question index changed (going to next question)
+  if (prevQuestionIndex !== null && prevQuestionIndex !== currentIdx && currentIdx >= 0) {
+    soundEffects.questionNext()
+  }
+  // Leaderboard revealed
+  if (prevShowLeaderboard !== null && !prevShowLeaderboard && currentShowLeaderboard) {
+    soundEffects.correct()
+    if (!ambientAudioInstance) {
+      ambientAudioInstance = soundEffects.leaderboardAmbience()
+    }
+  }
+  // Leaderboard closed
+  if (prevShowLeaderboard && !currentShowLeaderboard) {
+    if (ambientAudioInstance) {
+      ambientAudioInstance.pause()
+      ambientAudioInstance = null
+    }
+  }
+  // Session finished
+  if (prevSessionStatus && prevSessionStatus !== 'finished' && currentStatus === 'finished') {
+    soundEffects.victory()
+    if (ambientAudioInstance) {
+      ambientAudioInstance.pause()
+      ambientAudioInstance = null
+    }
+  }
+
+  prevQuestionIndex = currentIdx
+  prevShowLeaderboard = currentShowLeaderboard
+  prevSessionStatus = currentStatus
+}
+
+// Mouse auto-hide controls
+const showControls = ref(true)
+let mouseTimer = null
+
+function handleMouseMove() {
+  showControls.value = true
+  if (mouseTimer) clearTimeout(mouseTimer)
+  mouseTimer = setTimeout(() => {
+    showControls.value = false
+  }, 3000)
+}
+
+watch(showPresentationMode, (newVal) => {
+  if (newVal) {
+    window.addEventListener('mousemove', handleMouseMove)
+    handleMouseMove()
+  } else {
+    window.removeEventListener('mousemove', handleMouseMove)
+    if (mouseTimer) clearTimeout(mouseTimer)
+  }
+})
+
 // Form states
 const sessionForm = ref({ date: new Date().toISOString().split('T')[0], pic_karyawan: '', pic_intern: '', reference: '' })
 const participantForm = ref({ name: '' })
@@ -84,6 +165,57 @@ const imageFile = ref(null)
 const selectedSessionIdForQuestions = ref('')
 const selectedMonth = ref(new Date().toISOString().slice(0, 7)) // YYYY-MM
 const csvFile = ref(null)
+
+// General Leaderboards for Admin View
+const activeLeaderboardTab = ref('weekly')
+const weeklyLeaderboard = ref([])
+const weeklyCurrentData = ref(null)
+const lifetimeLeaderboard = ref([])
+
+async function fetchWeeklyCurrentLeaderboard() {
+  try {
+    const res = await fetch(`${API_BASE}/reports/weekly-current`)
+    if (res.ok) {
+      weeklyCurrentData.value = await res.json()
+    }
+  } catch (err) {
+    console.error("Gagal memuat leaderboard kuis terakhir:", err)
+  }
+}
+
+async function fetchWeeklyLeaderboard() {
+  const month = selectedMonth.value || new Date().toISOString().slice(0, 7)
+  try {
+    const res = await fetch(`${API_BASE}/reports/weekly?month=${month}`)
+    if (res.ok) {
+      const data = await res.json()
+      weeklyLeaderboard.value = data.leaderboard
+    }
+  } catch (err) {
+    console.error("Gagal memuat leaderboard mingguan:", err)
+  }
+}
+
+async function fetchLifetimeLeaderboard() {
+  try {
+    const res = await fetch(`${API_BASE}/reports/lifetime`)
+    if (res.ok) {
+      lifetimeLeaderboard.value = await res.json()
+    }
+  } catch (err) {
+    console.error("Gagal memuat leaderboard lifetime:", err)
+  }
+}
+
+function fetchLeaderboardTab(tab) {
+  if (tab === 'weekly') fetchWeeklyCurrentLeaderboard()
+  else if (tab === 'monthly') fetchWeeklyLeaderboard()
+  else if (tab === 'lifetime') fetchLifetimeLeaderboard()
+}
+
+watch(activeLeaderboardTab, (newTab) => {
+  fetchLeaderboardTab(newTab)
+})
 
 // UI Helpers
 const showAddQuestionModal = ref(false)
@@ -113,7 +245,7 @@ const mcqAnswerChoices = computed(() => {
 
 // QR Code redirect link points directly to /quiz
 const qrJoinUrl = computed(() => {
-  return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(window.location.origin + '/quiz')}`
+  return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(window.location.origin + '/')}`
 })
 
 const isLastQuestion = computed(() => {
@@ -131,6 +263,7 @@ function fetchAllData() {
   fetchSessions()
   fetchParticipants()
   fetchMonthlyLeaderboard()
+  fetchLeaderboardTab(activeLeaderboardTab.value)
 }
 
 async function fetchSessions() {
@@ -201,6 +334,7 @@ async function fetchLiveStats() {
       if (liveStats.value.session_status === 'finished') {
         activeSession.value.status = 'finished'
       }
+      syncPresentationAudioState(activeSession.value)
     }
   } catch (err) {
     console.error("Gagal sinkron stats live:", err)
@@ -231,6 +365,7 @@ async function fetchActiveSessionForPresentation() {
       } else {
         activeSession.value = null
       }
+      syncPresentationAudioState(activeSession.value)
     }
   } catch (err) {
     console.error("Gagal sinkron sesi presentasi:", err)
@@ -244,7 +379,14 @@ function startPresentationTimer(limit) {
   
   presentationTimerInterval = setInterval(() => {
     presentationTimeLeft.value = Math.max(0, presentationTimeLeft.value - 1)
-    if (presentationTimeLeft.value <= 0) {
+    if (presentationTimeLeft.value > 0) {
+      if (presentationTimeLeft.value <= 5) {
+        soundEffects.timerWarning()
+      } else {
+        soundEffects.timerTick()
+      }
+    } else if (presentationTimeLeft.value <= 0) {
+      soundEffects.incorrect()
       clearInterval(presentationTimerInterval)
     }
   }, 1000)
@@ -384,8 +526,12 @@ function handleNextQuestion() {
   const isShowingLeaderboard = activeSession.value.show_leaderboard === 1 || activeSession.value.show_leaderboard === true
 
   if (!isShowingLeaderboard) {
-    // Show leaderboard first
-    updateSessionStatus('active', currentIdx, 1)
+    if (isLastQuestion.value) {
+      handleEndSession()
+    } else {
+      // Show leaderboard first
+      updateSessionStatus('active', currentIdx, 1)
+    }
   } else {
     if (isLastQuestion.value) {
       handleEndSession()
@@ -405,6 +551,30 @@ function handleNextQuestion() {
 
 function handleEndSession() {
   updateSessionStatus('finished', questions.value.length)
+}
+
+async function handleResetSession() {
+  if (!activeSession.value) return
+  if (!confirm("Apakah Anda yakin ingin mengatur ulang sesi ini? Semua jawaban peserta dalam sesi ini akan dihapus untuk simulasi ulang.")) return
+  
+  try {
+    const res = await fetch(`${API_BASE}/admin/sessions/${activeSession.value.id}/reset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    })
+    const data = await res.json()
+    if (res.ok) {
+      activeSession.value = data
+      successMsg.value = "Sesi berhasil diatur ulang menjadi Draft untuk simulasi ulang."
+      fetchSessions()
+      fetchLiveStats()
+      fetchLeaderboardTab(activeLeaderboardTab.value)
+    } else {
+      alert(data.error || "Gagal mengatur ulang sesi.")
+    }
+  } catch (err) {
+    console.error("Gagal reset sesi:", err)
+  }
 }
 
 function openPresentationNewTab() {
@@ -718,13 +888,15 @@ function getOptionSubmitPercentage(option) {
       v-if="showPresentationMode" 
       class="fixed inset-0 z-50 bg-slate-950 text-white flex flex-col font-sans overflow-y-auto select-none"
     >
-      <!-- Presentation Top Bar -->
+      <!-- Presentation Top Bar (Consistent with Main Navbar) -->
       <div class="bg-slate-900 border-b border-white/5 px-6 py-4 flex items-center justify-between">
-        <div class="flex items-center space-x-3">
-          <div class="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-slate-950 font-black text-lg">P</div>
+        <div class="flex items-center space-x-4">
+          <div class="relative group">
+            <img src="/paragon-mark.png" alt="Paragon" class="h-10 w-auto object-contain filter brightness-0 invert" />
+          </div>
           <div>
-            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-100">Paragon ETRM Live Presentasi</h2>
-            <p class="text-[10px] text-slate-400 font-semibold leading-none mt-0.5">OWN THE MORNING SYSTEM</p>
+            <h1 class="font-black tracking-wider text-sm md:text-base bg-clip-text text-transparent bg-gradient-to-r from-accent-cyan via-paragon-light to-paragon-ice drop-shadow-[0_0_8px_rgba(34,211,238,0.4)]">Own The Morning</h1>
+            <span class="text-[8px] md:text-[9px] text-accent-cyan font-bold tracking-widest block leading-none">ETRM (Live Presentasi)</span>
           </div>
         </div>
         
@@ -759,7 +931,7 @@ function getOptionSubmitPercentage(option) {
             </div>
             <div class="space-y-1">
               <span class="text-[10px] font-black tracking-widest text-slate-400 uppercase">Tautan Akses</span>
-              <p class="font-bold text-sm text-paragon-medium underline select-text">{{ locationOrigin }}/quiz</p>
+              <p class="font-bold text-sm text-paragon-medium underline select-text">{{ locationOrigin }}/</p>
             </div>
           </div>
 
@@ -815,6 +987,13 @@ function getOptionSubmitPercentage(option) {
             <div class="grid grid-cols-3 gap-4 items-end pt-8 max-w-lg mx-auto">
               <!-- 2nd Place -->
               <div class="flex flex-col items-center">
+                <div v-if="liveStats?.participants[1]" class="w-12 h-12 rounded-full bg-slate-800 border-2 border-white/20 overflow-hidden shadow-lg mb-2 flex items-center justify-center">
+                  <img 
+                    :src="`/assets/avatars/${getAvatarFileName(liveStats?.participants[1])}`" 
+                    :alt="liveStats?.participants[1]?.name"
+                    class="w-full h-full object-cover"
+                  />
+                </div>
                 <div class="text-sm font-bold text-slate-300 truncate w-full max-w-24">{{ liveStats?.participants[1]?.name || '-' }}</div>
                 <div class="text-xs font-black text-paragon-light">{{ liveStats?.participants[1]?.current_score || 0 }} Pts</div>
                 <div class="w-full bg-slate-900 border border-white/10 rounded-t-2xl h-24 flex items-center justify-center mt-3 shadow-2xl">
@@ -823,6 +1002,13 @@ function getOptionSubmitPercentage(option) {
               </div>
               <!-- 1st Place -->
               <div class="flex flex-col items-center">
+                <div v-if="liveStats?.participants[0]" class="w-14 h-14 rounded-full bg-amber-500/20 border-2 border-amber-400 overflow-hidden shadow-2xl mb-2 flex items-center justify-center relative">
+                  <img 
+                    :src="`/assets/avatars/${getAvatarFileName(liveStats?.participants[0])}`" 
+                    :alt="liveStats?.participants[0]?.name"
+                    class="w-full h-full object-cover"
+                  />
+                </div>
                 <div class="text-base font-black text-amber-500 truncate w-full max-w-24">{{ liveStats?.participants[0]?.name || '-' }}</div>
                 <div class="text-sm font-black text-amber-400">{{ liveStats?.participants[0]?.current_score || 0 }} Pts</div>
                 <div class="w-full bg-amber-500/10 border border-amber-500/30 rounded-t-2xl h-36 flex items-center justify-center mt-3 relative shadow-2xl">
@@ -832,6 +1018,13 @@ function getOptionSubmitPercentage(option) {
               </div>
               <!-- 3rd Place -->
               <div class="flex flex-col items-center">
+                <div v-if="liveStats?.participants[2]" class="w-12 h-12 rounded-full bg-slate-800 border-2 border-white/20 overflow-hidden shadow-lg mb-2 flex items-center justify-center">
+                  <img 
+                    :src="`/assets/avatars/${getAvatarFileName(liveStats?.participants[2])}`" 
+                    :alt="liveStats?.participants[2]?.name"
+                    class="w-full h-full object-cover"
+                  />
+                </div>
                 <div class="text-sm font-bold text-slate-300 truncate w-full max-w-24">{{ liveStats?.participants[2]?.name || '-' }}</div>
                 <div class="text-xs font-black text-paragon-light">{{ liveStats?.participants[2]?.current_score || 0 }} Pts</div>
                 <div class="w-full bg-slate-950 border border-white/5 rounded-t-2xl h-16 flex items-center justify-center mt-3 shadow-2xl">
@@ -958,6 +1151,13 @@ function getOptionSubmitPercentage(option) {
           <div class="grid grid-cols-3 gap-4 items-end pt-8 max-w-lg mx-auto">
             <!-- 2nd Place -->
             <div class="flex flex-col items-center">
+              <div v-if="liveStats?.participants[1]" class="w-12 h-12 rounded-full bg-slate-800 border-2 border-white/20 overflow-hidden shadow-lg mb-2 flex items-center justify-center">
+                <img 
+                  :src="`/assets/avatars/${getAvatarFileName(liveStats?.participants[1])}`" 
+                  :alt="liveStats?.participants[1]?.name"
+                  class="w-full h-full object-cover"
+                />
+              </div>
               <div class="text-sm font-bold text-slate-300 truncate w-full max-w-24">{{ liveStats?.participants[1]?.name || '-' }}</div>
               <div class="text-xs font-black text-paragon-light">{{ liveStats?.participants[1]?.current_score || 0 }} Pts</div>
               <div class="w-full bg-slate-900 border border-white/10 rounded-t-2xl h-24 flex items-center justify-center mt-3 shadow-2xl">
@@ -966,6 +1166,13 @@ function getOptionSubmitPercentage(option) {
             </div>
             <!-- 1st Place -->
             <div class="flex flex-col items-center">
+              <div v-if="liveStats?.participants[0]" class="w-14 h-14 rounded-full bg-amber-500/20 border-2 border-amber-400 overflow-hidden shadow-2xl mb-2 flex items-center justify-center relative">
+                <img 
+                  :src="`/assets/avatars/${getAvatarFileName(liveStats?.participants[0])}`" 
+                  :alt="liveStats?.participants[0]?.name"
+                  class="w-full h-full object-cover"
+                />
+              </div>
               <div class="text-base font-black text-amber-500 truncate w-full max-w-24">{{ liveStats?.participants[0]?.name || '-' }}</div>
               <div class="text-sm font-black text-amber-400">{{ liveStats?.participants[0]?.current_score || 0 }} Pts</div>
               <div class="w-full bg-amber-500/10 border border-amber-500/30 rounded-t-2xl h-36 flex items-center justify-center mt-3 relative shadow-2xl">
@@ -975,6 +1182,13 @@ function getOptionSubmitPercentage(option) {
             </div>
             <!-- 3rd Place -->
             <div class="flex flex-col items-center">
+              <div v-if="liveStats?.participants[2]" class="w-12 h-12 rounded-full bg-slate-800 border-2 border-white/20 overflow-hidden shadow-lg mb-2 flex items-center justify-center">
+                <img 
+                  :src="`/assets/avatars/${getAvatarFileName(liveStats?.participants[2])}`" 
+                  :alt="liveStats?.participants[2]?.name"
+                  class="w-full h-full object-cover"
+                />
+              </div>
               <div class="text-sm font-bold text-slate-300 truncate w-full max-w-24">{{ liveStats?.participants[2]?.name || '-' }}</div>
               <div class="text-xs font-black text-paragon-light">{{ liveStats?.participants[2]?.current_score || 0 }} Pts</div>
               <div class="w-full bg-slate-950 border border-white/5 rounded-t-2xl h-16 flex items-center justify-center mt-3 shadow-2xl">
@@ -983,6 +1197,57 @@ function getOptionSubmitPercentage(option) {
             </div>
           </div>
         </div>
+        <!-- Floating Admin control bar -->
+        <transition name="fade">
+          <div 
+            v-if="showControls" 
+            class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 backdrop-blur border border-white/10 px-6 py-3.5 rounded-2xl flex items-center gap-4 shadow-2xl transition-all duration-300"
+          >
+            <span class="text-[10px] font-black uppercase text-slate-400 tracking-wider">Kontrol Presentasi:</span>
+            
+            <button 
+              v-if="activeSession.status === 'draft' || activeSession.current_question_index === -1"
+              @click="handleStartQuiz"
+              class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-xl transition-all flex items-center space-x-1.5 shadow"
+            >
+              <Play class="w-3.5 h-3.5 fill-white" />
+              <span>Mulai Kuis</span>
+            </button>
+
+            <button 
+              v-if="activeSession.status === 'active' && activeSession.current_question_index >= 0"
+              @click="handleNextQuestion"
+              class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-extrabold rounded-xl transition-all flex items-center space-x-1.5 shadow"
+            >
+              <FastForward class="w-3.5 h-3.5" />
+              <span>
+                {{ 
+                  activeSession.show_leaderboard 
+                    ? (isLastQuestion ? 'Akhiri Kuis' : 'Soal Berikutnya') 
+                    : (isLastQuestion ? 'Leaderboard Akhir' : 'Leaderboard Sementara') 
+                }}
+              </span>
+            </button>
+
+            <button 
+              v-if="activeSession.status === 'active'"
+              @click="handleEndSession"
+              class="px-3 py-2 border border-red-500/30 hover:bg-red-500/10 text-red-400 text-[10px] font-bold rounded-xl transition-all"
+            >
+              Selesai Paksa
+            </button>
+
+            <!-- Close presentation button on final leaderboard -->
+            <button 
+              v-if="activeSession.status === 'finished'"
+              @click="showPresentationMode = false"
+              class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold rounded-xl transition-all flex items-center space-x-1.5 shadow"
+            >
+              <Minimize2 class="w-3.5 h-3.5" />
+              <span>Sudahi / Tutup Presentasi</span>
+            </button>
+          </div>
+        </transition>
       </div>
     </div>
 
@@ -1038,6 +1303,14 @@ function getOptionSubmitPercentage(option) {
       >
         <Award class="w-4 h-4" />
         <span>ESOT &amp; Laporan</span>
+      </button>
+      <button 
+        @click="activeTab = 'leaderboards'; fetchLeaderboardTab(activeLeaderboardTab)" 
+        :class="activeTab === 'leaderboards' ? 'border-paragon-medium text-paragon-ice font-black bg-paragon-medium/10' : 'border-transparent text-dark-text-secondary hover:text-dark-text font-semibold'"
+        class="px-4 py-2.5 rounded-xl border text-xs md:text-sm transition-all flex items-center space-x-2"
+      >
+        <Trophy class="w-4 h-4" />
+        <span>Peringkat Umum</span>
       </button>
     </div>
 
@@ -1246,6 +1519,16 @@ function getOptionSubmitPercentage(option) {
               class="px-4 py-3 border border-red-200 text-red-600 hover:bg-red-50 font-bold rounded-xl text-xs flex items-center space-x-1.5 transition-all"
             >
               <span>Akhiri Kuis Paksa</span>
+            </button>
+
+            <!-- 5. Reset / Restart Session (Simulasi) -->
+            <button 
+              v-if="activeSession.status === 'active' || activeSession.status === 'finished'" 
+              @click="handleResetSession"
+              class="px-4 py-3 border border-amber-500/50 text-amber-500 hover:bg-amber-500/10 font-bold rounded-xl text-xs flex items-center space-x-1.5 transition-all"
+            >
+              <RotateCcw class="w-4 h-4" />
+              <span>Simulasi Ulang (Reset Sesi)</span>
             </button>
           </div>
 
@@ -1480,59 +1763,26 @@ function getOptionSubmitPercentage(option) {
     </div>
 
     <!-- TAB 4: Reporting & Backup settings -->
-    <div v-if="activeTab === 'reports'" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- Winner monthly tracker -->
-      <div class="lg:col-span-1 bg-dark-surface p-6 rounded-3xl border border-dark-border shadow-xl space-y-6">
-        <h3 class="font-extrabold text-base text-paragon-light border-b border-dark-border pb-3">Monthly Top 3 Tracker</h3>
-
-        <div class="space-y-4">
-          <div>
-            <label class="block text-xs font-bold text-paragon-light mb-1.5">Pilih Bulan Laporan</label>
-            <input 
-              v-model="selectedMonth" 
-              type="month" 
-              @change="fetchMonthlyLeaderboard"
-              class="w-full bg-dark-surface-hover border border-dark-border text-dark-text text-xs font-bold rounded-xl px-3 py-2.5 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30"
-            />
-          </div>
-
-          <!-- Top 3 display -->
-          <div class="space-y-3 pt-2">
-            <h4 class="text-[10px] font-black text-paragon-light/60 uppercase tracking-widest">Pemenang Top 3 Kuis</h4>
-            
-            <div v-if="monthlyLeaderboard.length === 0" class="text-dark-text-secondary text-xs py-4 font-semibold text-center bg-dark-surface-hover rounded-xl">
-              Belum ada data nilai di bulan ini.
-            </div>
-            
-            <div v-else class="space-y-2">
-              <div 
-                v-for="(w, idx) in monthlyLeaderboard.slice(0, 3)" 
-                :key="w.participant_id" 
-                class="flex items-center justify-between p-3.5 rounded-xl border"
-                :class="idx === 0 ? 'bg-amber-500/10 border-amber-500/30 text-amber-300' : 'bg-dark-surface-hover border-dark-border text-dark-text-secondary'"
-              >
-                <div class="flex items-center space-x-2 font-bold text-xs">
-                  <span class="text-base">{{ idx === 0 ? '🏆' : idx === 1 ? '🥈' : '🥉' }}</span>
-                  <span class="truncate max-w-32">{{ w.name }}</span>
-                </div>
-                <div class="text-right">
-                  <div class="font-extrabold text-xs">{{ w.total_score }} Pts</div>
-                  <div class="text-[9px] font-semibold opacity-70">Main: {{ w.sessions_played }} kali</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
+    <div v-if="activeTab === 'reports'" class="grid grid-cols-1 gap-6">
       <!-- Report Generation & Reset Data -->
-      <div class="lg:col-span-2 bg-dark-surface p-6 rounded-3xl border border-dark-border shadow-xl space-y-6">
+      <div class="bg-dark-surface p-6 rounded-3xl border border-dark-border shadow-xl space-y-6">
         <!-- Downloads Excel -->
         <div class="space-y-4">
           <h3 class="font-extrabold text-base text-paragon-light border-b border-dark-border pb-3 flex items-center justify-between">
             <span>Ekspor File Laporan (Excel)</span>
             <FileSpreadsheet class="w-4 h-4 text-emerald-400" />
           </h3>
+
+          <!-- Month filter selection directly inside Excel panel -->
+          <div class="flex flex-col sm:flex-row sm:items-center gap-3 bg-dark-surface-hover p-4 rounded-2xl border border-dark-border w-max">
+            <label class="text-xs font-bold text-paragon-light uppercase tracking-wider">Pilih Bulan Laporan:</label>
+            <input 
+              v-model="selectedMonth" 
+              type="month" 
+              @change="fetchMonthlyLeaderboard"
+              class="bg-dark-surface border border-dark-border text-dark-text text-xs font-bold rounded-xl px-3 py-1.5 outline-none focus:border-paragon-medium"
+            />
+          </div>
           
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="p-4 border border-dark-border rounded-2xl bg-dark-surface-hover hover:border-emerald-500/30 space-y-3 flex flex-col justify-between transition-all">
@@ -1597,37 +1847,169 @@ function getOptionSubmitPercentage(option) {
       </div>
     </div>
 
+    <!-- TAB 5: General Leaderboard for Admin (matching user view, no avatars) -->
+    <div v-if="activeTab === 'leaderboards'" class="bg-dark-surface p-6 rounded-3xl border border-dark-border shadow-xl space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-dark-border pb-4 gap-4">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-cyan to-paragon-medium flex items-center justify-center shadow-lg shadow-cyan-500/25">
+            <Trophy class="w-5 h-5 text-white" />
+          </div>
+          <h3 class="font-black text-lg text-paragon-ice">🏆 Peringkat Umum</h3>
+        </div>
+        
+        <!-- Tab Buttons -->
+        <div class="flex bg-dark-surface-hover p-1 rounded-xl border border-dark-border">
+          <button 
+            @click="activeLeaderboardTab = 'weekly'"
+            class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all"
+            :class="activeLeaderboardTab === 'weekly' ? 'bg-gradient-to-r from-paragon-medium to-paragon-dark text-white shadow' : 'text-dark-text-secondary hover:text-white'"
+          >
+            Mingguan
+          </button>
+          <button 
+            @click="activeLeaderboardTab = 'monthly'"
+            class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all"
+            :class="activeLeaderboardTab === 'monthly' ? 'bg-gradient-to-r from-paragon-medium to-paragon-dark text-white shadow' : 'text-dark-text-secondary hover:text-white'"
+          >
+            Bulanan
+          </button>
+          <button 
+            @click="activeLeaderboardTab = 'lifetime'"
+            class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all"
+            :class="activeLeaderboardTab === 'lifetime' ? 'bg-gradient-to-r from-paragon-medium to-paragon-dark text-white shadow' : 'text-dark-text-secondary hover:text-white'"
+          >
+            Lifetime
+          </button>
+        </div>
+      </div>
+
+      <!-- Weekly Leaderboard Table (Latest Quiz Session) -->
+      <div v-if="activeLeaderboardTab === 'weekly'" class="space-y-4">
+        <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4 flex justify-between">
+          <span>Kuis Terakhir</span>
+          <span class="text-paragon-light font-extrabold">{{ weeklyCurrentData?.weekInfo || 'Belum Ada Sesi Kuis Selesai' }}</span>
+        </div>
+        <div class="space-y-2 max-h-[450px] overflow-y-auto pr-2">
+          <div v-if="!weeklyCurrentData?.leaderboard || weeklyCurrentData.leaderboard.length === 0" class="text-dark-text-secondary text-xs text-center py-6">
+            Belum ada data kuis pekan ini.
+          </div>
+          <div 
+            v-else
+            v-for="(p, idx) in weeklyCurrentData.leaderboard" 
+            :key="p.participant_id"
+            class="flex justify-between items-center px-4 py-3.5 rounded-2xl border border-dark-border bg-dark-surface-hover text-xs font-bold text-dark-text"
+          >
+            <div class="flex items-center space-x-3 flex-1 min-w-0">
+              <span class="w-5 text-slate-500 font-extrabold text-[10px]">#{{ idx + 1 }}</span>
+              <span class="truncate text-dark-text leading-tight">{{ p.name }}</span>
+            </div>
+            <span class="text-xs font-black text-paragon-light">{{ p.total_score }} Pts</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Monthly Leaderboard Table (Weekly Breakdown W1-W5) -->
+      <div v-else-if="activeLeaderboardTab === 'monthly'" class="space-y-4">
+        <!-- Date picker row -->
+        <div class="flex items-center space-x-3 px-4">
+          <label class="text-[10px] font-black text-paragon-light uppercase tracking-widest">Bulan Laporan:</label>
+          <input 
+            v-model="selectedMonth" 
+            type="month" 
+            @change="fetchWeeklyLeaderboard"
+            class="bg-dark-surface border border-dark-border text-dark-text text-[11px] font-bold rounded-lg px-2 py-1 outline-none focus:border-paragon-medium focus:ring-1 focus:ring-paragon-medium"
+          />
+        </div>
+        <div class="flex items-center justify-between text-[10px] font-black text-paragon-light/60 uppercase tracking-widest px-4">
+          <span>Peserta</span>
+          <div class="flex space-x-3">
+            <span class="w-9 text-center">W1</span>
+            <span class="w-9 text-center">W2</span>
+            <span class="w-9 text-center">W3</span>
+            <span class="w-9 text-center">W4</span>
+            <span class="w-9 text-center">W5</span>
+            <span class="w-12 text-right">Total</span>
+          </div>
+        </div>
+        <div class="space-y-2 max-h-[450px] overflow-y-auto pr-2">
+          <div v-if="weeklyLeaderboard.length === 0" class="text-dark-text-secondary text-xs text-center py-6">
+            Tidak ada data untuk bulan ini.
+          </div>
+          <div 
+            v-else
+            v-for="(p, idx) in weeklyLeaderboard" 
+            :key="p.participant_id"
+            class="flex justify-between items-center px-4 py-3.5 rounded-2xl border border-dark-border bg-dark-surface-hover text-xs font-bold text-dark-text"
+          >
+            <div class="flex items-center space-x-3 flex-1 min-w-0">
+              <span class="w-5 text-slate-500 font-extrabold text-[10px]">#{{ idx + 1 }}</span>
+              <span class="truncate text-dark-text leading-tight">{{ p.name }}</span>
+            </div>
+            <div class="flex space-x-3 text-[10px] font-bold text-slate-400">
+              <span class="w-9 text-center">{{ p.weeks[0] || '-' }}</span>
+              <span class="w-9 text-center">{{ p.weeks[1] || '-' }}</span>
+              <span class="w-9 text-center">{{ p.weeks[2] || '-' }}</span>
+              <span class="w-9 text-center">{{ p.weeks[3] || '-' }}</span>
+              <span class="w-9 text-center">{{ p.weeks[4] || '-' }}</span>
+              <span class="w-12 text-right text-xs font-black text-paragon-light">{{ p.total }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lifetime Leaderboard Table -->
+      <div v-else-if="activeLeaderboardTab === 'lifetime'" class="space-y-3">
+        <div class="flex justify-between items-center text-[10px] font-black text-paragon-light/60 uppercase tracking-widest px-4">
+          <span>Peserta</span>
+          <span>Skor</span>
+        </div>
+        <div class="space-y-2 max-h-[450px] overflow-y-auto pr-2">
+          <div 
+            v-for="(p, idx) in lifetimeLeaderboard" 
+            :key="p.participant_id"
+            class="flex justify-between items-center px-4 py-3 rounded-2xl border border-dark-border bg-dark-surface-hover text-xs font-bold text-dark-text"
+          >
+            <div class="flex items-center space-x-3 flex-1 min-w-0">
+              <span class="w-5 text-slate-500 font-extrabold text-[10px]">#{{ idx + 1 }}</span>
+              <span class="text-dark-text truncate leading-tight">{{ p.name }}</span>
+            </div>
+            <span class="text-xs font-black text-paragon-light">{{ p.lifetime_score }} Pts</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- MODAL: ADD / EDIT QUESTION (DYNAMIC OPTIONS & DROPDOWN MCQ ANSWER) -->
     <div 
       v-if="showAddQuestionModal" 
-      class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
+      class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
     >
-      <div class="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 md:p-8 space-y-6">
-        <div class="flex justify-between items-center border-b border-slate-100 pb-3">
-          <h3 class="font-black text-lg text-paragon-dark">
+      <div class="bg-dark-surface rounded-3xl border border-dark-border shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 md:p-8 space-y-6 text-dark-text">
+        <div class="flex justify-between items-center border-b border-dark-border pb-3">
+          <h3 class="font-black text-lg text-paragon-ice">
             {{ isEditingQuestion ? 'Edit Pertanyaan' : 'Tambah Pertanyaan Kuis' }}
           </h3>
-          <button @click="showAddQuestionModal = false" class="text-slate-400 hover:text-slate-600 p-1.5"><X class="w-5 h-5" /></button>
+          <button @click="showAddQuestionModal = false" class="text-dark-text-secondary hover:text-white p-1.5 transition-colors"><X class="w-5 h-5" /></button>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-semibold text-slate-700">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-semibold text-paragon-light">
           <!-- Question text -->
           <div class="md:col-span-2">
-            <label class="block mb-1.5">Teks Pertanyaan</label>
+            <label class="block mb-1.5 text-paragon-light uppercase tracking-widest text-[10px]">Teks Pertanyaan</label>
             <textarea 
               v-model="questionForm.question_text" 
               rows="2"
               placeholder="Ketik detail pertanyaan sharing..."
-              class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-paragon-medium font-medium"
+              class="w-full bg-dark-surface-hover border border-dark-border text-dark-text rounded-xl px-3 py-2 outline-none focus:border-paragon-medium font-medium focus:ring-2 focus:ring-paragon-medium/30 transition-all placeholder-dark-text-secondary/30"
             ></textarea>
           </div>
 
           <!-- Question Type -->
           <div>
-            <label class="block mb-1.5">Tipe Pertanyaan</label>
+            <label class="block mb-1.5 text-paragon-light uppercase tracking-widest text-[10px]">Tipe Pertanyaan</label>
             <select 
               v-model="questionForm.question_type"
-              class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-paragon-medium"
+              class="w-full bg-dark-surface-hover border border-dark-border text-dark-text rounded-xl px-3 py-2 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 transition-all cursor-pointer"
             >
               <option value="multiple_choice">Pilihan Ganda (Multiple Choice)</option>
               <option value="true_false">Benar / Salah (True / False)</option>
@@ -1639,23 +2021,23 @@ function getOptionSubmitPercentage(option) {
           <!-- Dynamic Options config if MCQ / Polling -->
           <div 
             v-if="questionForm.question_type === 'multiple_choice' || questionForm.question_type === 'polling'"
-            class="md:col-span-2 p-5 bg-slate-50 border border-slate-200/50 rounded-2xl space-y-4"
+            class="md:col-span-2 p-5 bg-dark-surface-hover border border-dark-border rounded-2xl space-y-4"
           >
-            <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 pb-2">Pilihan Jawaban</div>
+            <div class="text-[10px] font-black text-paragon-light uppercase tracking-widest border-b border-dark-border pb-2">Pilihan Jawaban</div>
             
             <!-- Dynamic Grid displaying options with inline delete button -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div 
                 v-for="(opt, idx) in questionForm.options" 
                 :key="idx"
-                class="p-4 bg-white border border-slate-200 rounded-xl space-y-2 relative shadow-sm"
+                class="p-4 bg-dark-surface border border-dark-border rounded-xl space-y-2 relative shadow-sm"
               >
                 <div class="flex justify-between items-center">
-                  <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Opsi {{ String.fromCharCode(65 + idx) }}</span>
+                  <span class="text-[10px] font-extrabold text-paragon-light/60 uppercase tracking-wider">Opsi {{ String.fromCharCode(65 + idx) }}</span>
                   <button 
                     v-if="questionForm.options.length > 2"
                     @click="removeQuestionOptionSpecific(idx)"
-                    class="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded-lg transition-all"
+                    class="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-1.5 rounded-lg transition-all"
                     title="Hapus opsi ini"
                   >
                     <Trash2 class="w-3.5 h-3.5" />
@@ -1665,7 +2047,7 @@ function getOptionSubmitPercentage(option) {
                   v-model="questionForm.options[idx]" 
                   type="text" 
                   placeholder="Ketik isi pilihan..."
-                  class="mcq-option-input w-full bg-slate-50 focus:bg-white border border-slate-200 focus:border-paragon-medium text-xs font-semibold rounded-lg px-3 py-2 outline-none transition-all"
+                  class="mcq-option-input w-full bg-dark-surface-hover focus:bg-dark-surface border border-dark-border focus:border-paragon-medium text-xs font-semibold rounded-lg px-3 py-2 outline-none transition-all focus:ring-2 focus:ring-paragon-medium/30 text-dark-text"
                 />
               </div>
 
@@ -1673,7 +2055,7 @@ function getOptionSubmitPercentage(option) {
               <button 
                 v-if="questionForm.options.length < 6"
                 @click="addQuestionOption"
-                class="border border-dashed border-slate-300 hover:border-paragon-medium bg-slate-50/50 hover:bg-paragon-ice/30 rounded-xl p-6 flex flex-col items-center justify-center space-y-1 transition-all text-slate-400 hover:text-paragon-medium"
+                class="border border-dashed border-dark-border hover:border-paragon-medium bg-dark-surface/50 hover:bg-paragon-medium/10 rounded-xl p-6 flex flex-col items-center justify-center space-y-1 transition-all text-dark-text-secondary hover:text-paragon-ice"
               >
                 <Plus class="w-5 h-5" />
                 <span class="text-[10px] font-bold uppercase tracking-wider">Tambah Opsi Pilihan</span>
@@ -1683,13 +2065,13 @@ function getOptionSubmitPercentage(option) {
 
           <!-- Correct answer (MCQ/TF uses Dropdown, HIDE if Polling) -->
           <div v-if="questionForm.question_type !== 'polling'">
-            <label class="block mb-1.5">Jawaban Benar</label>
+            <label class="block mb-1.5 text-paragon-light uppercase tracking-widest text-[10px]">Jawaban Benar</label>
             
             <!-- Dropdown for MCQ and True-False choices -->
             <select 
               v-if="questionForm.question_type === 'multiple_choice' || questionForm.question_type === 'true_false'"
               v-model="questionForm.correct_answer"
-              class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-paragon-medium"
+              class="w-full bg-dark-surface-hover border border-dark-border text-dark-text rounded-xl px-3 py-2 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 cursor-pointer"
             >
               <option value="" disabled>-- Pilih Jawaban Benar --</option>
               <option v-for="c in mcqAnswerChoices" :key="c" :value="c">{{ c }}</option>
@@ -1701,74 +2083,74 @@ function getOptionSubmitPercentage(option) {
               v-model="questionForm.correct_answer" 
               type="text" 
               placeholder="Ketik jawaban benar..."
-              class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-paragon-medium"
+              class="w-full bg-dark-surface-hover border border-dark-border text-dark-text rounded-xl px-3 py-2 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 focus:bg-dark-surface"
             />
           </div>
 
           <!-- Explanation -->
           <div class="md:col-span-2">
-            <label class="block mb-1.5">Penjelasan Singkat (Feedback Loop)</label>
+            <label class="block mb-1.5 text-paragon-light uppercase tracking-widest text-[10px]">Penjelasan Singkat (Feedback Loop)</label>
             <textarea 
               v-model="questionForm.explanation" 
               rows="2"
               placeholder="Penjelasan jawaban benar untuk pemahaman peserta..."
-              class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-paragon-medium font-medium"
+              class="w-full bg-dark-surface-hover border border-dark-border text-dark-text rounded-xl px-3 py-2 outline-none focus:border-paragon-medium font-medium focus:ring-2 focus:ring-paragon-medium/30 placeholder-dark-text-secondary/30"
             ></textarea>
           </div>
 
           <!-- Image upload -->
           <div>
-            <label class="block mb-1.5">Lampirkan Gambar (Media Context)</label>
+            <label class="block mb-1.5 text-paragon-light uppercase tracking-widest text-[10px]">Lampirkan Gambar (Media Context)</label>
             <input 
               type="file" 
               accept="image/*"
               @change="handleImageSelect"
-              class="w-full text-xs file:mr-2 file:py-1 file:px-2 file:border-0 file:bg-paragon-ice file:text-paragon-medium file:rounded file:font-semibold"
+              class="w-full text-xs file:mr-2 file:py-1.5 file:px-3 file:border file:border-dark-border file:bg-dark-surface-hover file:text-paragon-light file:rounded-xl file:font-semibold hover:file:bg-dark-surface file:transition-all cursor-pointer file:text-xs"
             />
           </div>
 
           <!-- Timer & Points & Sort Order -->
           <div class="grid grid-cols-3 gap-2">
             <div>
-              <label class="block mb-1.5">Limit (s)</label>
+              <label class="block mb-1.5 text-paragon-light uppercase tracking-widest text-[8px]">Limit (s)</label>
               <input 
                 v-model="questionForm.time_limit" 
                 type="number" 
-                class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-paragon-medium"
+                class="w-full bg-dark-surface-hover border border-dark-border text-dark-text rounded-xl px-3 py-2 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 focus:bg-dark-surface"
               />
             </div>
             <div>
-              <label class="block mb-1.5">Poin</label>
+              <label class="block mb-1.5 text-paragon-light uppercase tracking-widest text-[8px]">Poin</label>
               <input 
                 v-model="questionForm.points" 
                 type="number" 
-                class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-paragon-medium"
+                class="w-full bg-dark-surface-hover border border-dark-border text-dark-text rounded-xl px-3 py-2 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 focus:bg-dark-surface"
               />
             </div>
             <div>
-              <label class="block mb-1.5">Urutan</label>
+              <label class="block mb-1.5 text-paragon-light uppercase tracking-widest text-[8px]">Urutan</label>
               <input 
                 v-model="questionForm.sort_order" 
                 type="number" 
                 min="1"
                 :max="maxAllowedSortOrder"
-                class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-paragon-medium"
+                class="w-full bg-dark-surface-hover border border-dark-border text-dark-text rounded-xl px-3 py-2 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 focus:bg-dark-surface"
               />
             </div>
           </div>
         </div>
 
-        <div class="flex justify-end space-x-3 pt-4 border-t border-slate-100">
+        <div class="flex justify-end space-x-3 pt-4 border-t border-dark-border">
           <button 
             @click="showAddQuestionModal = false" 
-            class="px-4 py-2 border border-slate-200 text-xs font-bold text-slate-500 rounded-xl hover:bg-slate-50 transition-all"
+            class="px-4 py-2.5 border border-dark-border text-xs font-bold text-dark-text-secondary rounded-xl hover:bg-dark-surface-hover hover:text-white transition-all"
           >
             Batal
           </button>
           <button 
             @click="saveQuestion" 
             :disabled="loading"
-            class="px-5 py-2 bg-paragon-medium text-white text-xs font-bold rounded-xl hover:bg-paragon-dark disabled:opacity-50 transition-all shadow"
+            class="px-5 py-2.5 bg-paragon-medium text-white text-xs font-bold rounded-xl hover:bg-paragon-dark disabled:opacity-50 transition-all shadow"
           >
             {{ loading ? 'Menyimpan...' : 'Simpan Soal' }}
           </button>

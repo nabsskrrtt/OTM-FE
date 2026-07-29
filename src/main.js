@@ -4,6 +4,16 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import './index.css'
+import { soundEffects } from './utils/soundEffects'
+
+// Resume audio context on first user click to bypass browser autoplay blocks
+window.addEventListener('click', () => {
+  soundEffects.resumeContext()
+}, { once: true })
+window.addEventListener('touchstart', () => {
+  soundEffects.resumeContext()
+}, { once: true })
+
 
 // Bypass ngrok warning page for API calls
 const originalFetch = window.fetch;

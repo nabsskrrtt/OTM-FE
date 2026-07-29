@@ -88,3 +88,29 @@ body {
 html {
   scroll-behavior: smooth;
 }
+
+/* Custom Dark Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0F172A;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3A4A6B;
+  border-radius: 9999px;
+  border: 2px solid #0F172A;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #8DA9C4;
+}
+
+/* Firefox scrollbar styling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #3A4A6B #0F172A;
+}

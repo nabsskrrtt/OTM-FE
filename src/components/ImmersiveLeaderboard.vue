@@ -1,12 +1,30 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 
 const props = defineProps({
   leaderboard: Array,
-  currentParticipantId: Number
+  currentParticipantId: [Number, String]
 })
 
 let leaderboardAudio = null
+
+const isNotInTopThree = computed(() => {
+  if (!props.currentParticipantId || !props.leaderboard) return false
+  const idx = props.leaderboard.findIndex(p => p.participant_id == props.currentParticipantId || p.id == props.currentParticipantId)
+  return idx >= 3
+})
+
+const myRow = computed(() => {
+  if (!props.currentParticipantId || !props.leaderboard) return null
+  const idx = props.leaderboard.findIndex(p => p.participant_id == props.currentParticipantId || p.id == props.currentParticipantId)
+  if (idx >= 3) {
+    return {
+      rank: idx + 1,
+      participant: props.leaderboard[idx]
+    }
+  }
+  return null
+})
 
 const avatarFilenames = {
   1: 'panda.png',
@@ -16,28 +34,35 @@ const avatarFilenames = {
   5: 'fox.png'
 }
 
+import { soundEffects } from '../utils/soundEffects'
+
+let ambientInstance = null
+
 onMounted(() => {
-  // Play leaderboard ambience
   try {
-    leaderboardAudio = new Audio('/assets/sounds/leaderboard-ambience.mp3')
-    leaderboardAudio.volume = 0.3
-    leaderboardAudio.loop = true
-    leaderboardAudio.play().catch(() => {})
+    ambientInstance = soundEffects.leaderboardAmbience()
   } catch (e) {
     console.log('[v0] Leaderboard audio unavailable')
   }
 })
 
 onUnmounted(() => {
-  if (leaderboardAudio) {
-    leaderboardAudio.pause()
-    leaderboardAudio = null
+  if (ambientInstance) {
+    ambientInstance.pause()
+    ambientInstance = null
   }
 })
 
 const getAvatarFileName = (participant) => {
+  if (!participant) return 'panda.png'
+  if (participant.avatar_id && avatarFilenames[participant.avatar_id]) {
+    return avatarFilenames[participant.avatar_id]
+  }
   if (participant.avatar?.filename) {
     return participant.avatar.filename
+  }
+  if (participant.avatar?.id && avatarFilenames[participant.avatar.id]) {
+    return avatarFilenames[participant.avatar.id]
   }
   return 'panda.png' // default
 }
@@ -111,8 +136,10 @@ const getAvatarFileName = (participant) => {
         <div
           v-for="(p, idx) in leaderboard.slice(3)"
           :key="p.id"
-          :class="{ 'ring-2 ring-accent-cyan': currentParticipantId === p.id }"
-          class="flex items-center gap-3 px-4 py-3 bg-dark-surface-hover border border-dark-border rounded-xl text-xs hover:border-paragon-light/30 transition-all"
+          class="flex items-center gap-3 px-4 py-3 rounded-xl text-xs transition-all border"
+          :class="currentParticipantId == p.id || currentParticipantId == p.participant_id
+            ? 'border-accent-cyan bg-gradient-to-r from-cyan-950/40 via-dark-surface to-cyan-950/40 text-white font-extrabold shadow-[0_0_12px_rgba(6,182,212,0.25)] scale-[1.01]' 
+            : 'border-dark-border bg-dark-surface-hover hover:border-paragon-light/30'"
         >
           <div class="w-8 h-8 rounded-full bg-dark-border overflow-hidden flex-shrink-0">
             <img
@@ -123,10 +150,32 @@ const getAvatarFileName = (participant) => {
           </div>
           <div class="font-semibold text-dark-text flex-1">
             <span class="text-paragon-light/50 mr-2">#{{ idx + 4 }}</span>
-            <span class="text-dark-text-secondary">{{ p.name }}</span>
+            <span :class="currentParticipantId == p.id || currentParticipantId == p.id ? 'text-white' : 'text-dark-text-secondary'">{{ p.name }}</span>
+            <span v-if="currentParticipantId == p.id || currentParticipantId == p.participant_id" class="text-[8px] bg-gradient-to-r from-accent-cyan to-paragon-medium text-white px-2 py-0.5 rounded-full font-bold ml-2">⭐ Anda</span>
           </div>
-          <div class="font-bold text-paragon-light">{{ p.current_score }}⭐</div>
+          <div class="font-black text-paragon-light">{{ p.current_score }}⭐</div>
         </div>
+      </div>
+    </div>
+
+    <!-- Pinned "You" row at the very bottom if you are not in Top 3 -->
+    <div v-if="isNotInTopThree && myRow" class="pt-4 border-t border-dark-border">
+      <div
+        class="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-cyan-950/40 via-dark-surface to-cyan-950/40 border-2 border-accent-cyan rounded-xl text-xs shadow-[0_0_15px_rgba(6,182,212,0.3)] animate-pulse"
+      >
+        <div class="w-8 h-8 rounded-full bg-slate-800 border border-white/10 overflow-hidden flex-shrink-0">
+          <img
+            :src="`/assets/avatars/${getAvatarFileName(myRow.participant)}`"
+            :alt="myRow.participant.name"
+            class="w-full h-full object-cover"
+          />
+        </div>
+        <div class="font-extrabold text-white flex-1">
+          <span class="text-accent-cyan mr-2">#{{ myRow.rank }}</span>
+          <span>{{ myRow.participant.name }}</span>
+          <span class="text-[9px] bg-gradient-to-r from-accent-cyan to-paragon-medium text-white px-2 py-0.5 rounded-full font-bold ml-2">⭐ Anda</span>
+        </div>
+        <div class="font-black text-paragon-light text-sm">{{ myRow.participant.current_score || myRow.participant.total_score }}⭐</div>
       </div>
     </div>
   </div>

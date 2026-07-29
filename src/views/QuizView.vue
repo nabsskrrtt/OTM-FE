@@ -98,7 +98,19 @@ async function fetchActiveSession() {
       if (timerInterval) clearInterval(timerInterval)
       fetchLeaderboard()
     } else {
-      // Waiting room lobby
+      // Waiting room lobby (status is 'draft' or current_question_index is -1)
+      answersSubmitted.value = {}
+      try {
+        const keysToRemove = []
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (key && key.startsWith('otm_ans_')) {
+            keysToRemove.push(key)
+          }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k))
+      } catch (e) {}
+
       currentQuestion.value = null
       feedback.value = null
       if (timerInterval) clearInterval(timerInterval)
@@ -442,7 +454,7 @@ onUnmounted(() => {
             <!-- TYPE A: Multiple Choice -->
             <div v-if="currentQuestion.question_type === 'multiple_choice'" class="grid grid-cols-1 gap-3">
               <button 
-                v-for="(opt, idx) in currentQuestion.options" 
+                v-for="(opt, idx) in currentQuestion.options.filter(o => o && o.trim() !== '')" 
                 :key="idx"
                 @click="submitAnswer(opt)"
                 :disabled="loading"
@@ -493,7 +505,7 @@ onUnmounted(() => {
             <!-- TYPE D: Polling -->
             <div v-else-if="currentQuestion.question_type === 'polling'" class="grid grid-cols-1 gap-3">
               <button 
-                v-for="(opt, idx) in currentQuestion.options" 
+                v-for="(opt, idx) in currentQuestion.options.filter(o => o && o.trim() !== '')" 
                 :key="idx"
                 @click="submitAnswer(opt)"
                 :disabled="loading"
@@ -590,19 +602,22 @@ onUnmounted(() => {
     <!-- 4. Default Offline / Inactive Session Screen -->
     <div 
       v-else 
-      class="bg-white rounded-2xl border border-slate-100 shadow-xl p-8 text-center space-y-4"
+      class="bg-dark-surface rounded-3xl border border-dark-border shadow-2xl p-8 text-center space-y-6 relative overflow-hidden"
     >
-      <Trophy class="w-12 h-12 text-slate-300 mx-auto" />
-      <h2 class="text-xl font-bold text-slate-700">Sesi Live Tidak Aktif</h2>
-      <p class="text-xs text-slate-500 max-w-sm mx-auto">
-        Koneksi terputus atau sesi telah dihentikan oleh Admin.
-      </p>
-      <button 
-        @click="router.push('/')" 
-        class="px-4 py-2 border border-slate-200 text-xs font-bold text-slate-500 rounded-xl hover:bg-slate-50 transition-all"
-      >
-        Kembali ke Portal
-      </button>
+      <div class="absolute -right-8 -bottom-8 w-24 h-24 bg-paragon-medium/5 rounded-full blur-2xl"></div>
+      <div class="relative z-10 space-y-4">
+        <Trophy class="w-14 h-14 text-paragon-light/40 mx-auto animate-pulse" />
+        <h2 class="text-xl font-black text-paragon-ice">Sesi Live Tidak Aktif</h2>
+        <p class="text-xs text-dark-text-secondary max-w-xs mx-auto leading-relaxed">
+          Koneksi terputus atau sesi kuis belum diaktifkan oleh Admin. Tunggu sejenak ya! ⏳
+        </p>
+        <button 
+          @click="router.push('/')" 
+          class="px-6 py-2.5 bg-dark-surface-hover border border-dark-border text-xs font-bold text-paragon-light hover:border-paragon-medium rounded-xl transition-all shadow-sm"
+        >
+          Kembali ke Portal
+        </button>
+      </div>
     </div>
     </template>
   </div>

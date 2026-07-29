@@ -37,8 +37,8 @@ watch(() => route.path, () => {
             <div class="absolute inset-0 bg-white/10 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-lg"></div>
           </div>
           <div>
-            <h1 class="font-extrabold tracking-wider text-base md:text-lg text-white">Own The Morning</h1>
-            <span class="text-[8px] md:text-[9px] text-paragon-light font-bold tracking-widest">ETRM</span>
+            <h1 class="font-black tracking-wider text-base md:text-lg bg-clip-text text-transparent bg-gradient-to-r from-accent-cyan via-paragon-light to-paragon-ice drop-shadow-[0_0_8px_rgba(34,211,238,0.4)]">Own The Morning</h1>
+            <span class="text-[8px] md:text-[9px] text-accent-cyan font-bold tracking-widest block leading-none">ETRM</span>
           </div>
         </div>
 

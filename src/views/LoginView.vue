@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Award, Play, History, UserCheck, HelpCircle, X, Trophy } from 'lucide-vue-next'
 import ImmersiveAvatarCarousel from '../components/ImmersiveAvatarCarousel.vue'
@@ -34,6 +34,69 @@ let sessionPoller = null
 const selectedHistorySession = ref(null)
 const showLeaderboardModal = ref(false)
 const historyLeaderboard = ref([])
+
+const activeLeaderboardTab = ref('weekly')
+const weeklyLeaderboard = ref([])
+const weeklyCurrentData = ref(null)
+const lifetimeLeaderboard = ref([])
+const selectedMonthLeaderboard = ref(new Date().toISOString().slice(0, 7))
+
+function getAvatarFileName(participant) {
+  if (!participant || !participant.avatar_id) return 'panda.png'
+  const avatarFilenames = {
+    1: 'panda.png',
+    2: 'penguin.png',
+    3: 'bee.png',
+    4: 'monkey.png',
+    5: 'fox.png'
+  }
+  return avatarFilenames[participant.avatar_id] || 'panda.png'
+}
+
+async function fetchWeeklyCurrentLeaderboard() {
+  try {
+    const res = await fetch(`${API_BASE}/reports/weekly-current`)
+    if (res.ok) {
+      weeklyCurrentData.value = await res.json()
+    }
+  } catch (err) {
+    console.error("Gagal memuat leaderboard kuis terakhir:", err)
+  }
+}
+
+async function fetchWeeklyLeaderboard() {
+  const month = selectedMonthLeaderboard.value
+  try {
+    const res = await fetch(`${API_BASE}/reports/weekly?month=${month}`)
+    if (res.ok) {
+      const data = await res.json()
+      weeklyLeaderboard.value = data.leaderboard
+    }
+  } catch (err) {
+    console.error("Gagal memuat leaderboard mingguan:", err)
+  }
+}
+
+async function fetchLifetimeLeaderboard() {
+  try {
+    const res = await fetch(`${API_BASE}/reports/lifetime`)
+    if (res.ok) {
+      lifetimeLeaderboard.value = await res.json()
+    }
+  } catch (err) {
+    console.error("Gagal memuat leaderboard lifetime:", err)
+  }
+}
+
+function fetchLeaderboardTab(tab) {
+  if (tab === 'weekly') fetchWeeklyCurrentLeaderboard()
+  else if (tab === 'monthly') fetchWeeklyLeaderboard()
+  else if (tab === 'lifetime') fetchLifetimeLeaderboard()
+}
+
+watch(activeLeaderboardTab, (newTab) => {
+  fetchLeaderboardTab(newTab)
+})
 
 async function viewSessionLeaderboard(sessionItem) {
   try {
@@ -128,7 +191,7 @@ async function handleLogin() {
     const res = await fetch(`${API_BASE}/participants/join`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: selectedObj.name })
+      body: JSON.stringify({ name: selectedObj.name, avatar_id: selectedAvatarId.value })
     })
 
     const data = await res.json()
@@ -143,6 +206,7 @@ async function handleLogin() {
       sessionStorage.setItem('otm_avatar', JSON.stringify(selectedAvatar))
       successMsg.value = `Selamat datang, ${data.participant.name}!`
       fetchHistory(data.participant.id)
+      fetchLeaderboardTab(activeLeaderboardTab.value)
     } else {
       errorMsg.value = data.error || "Gagal masuk."
     }
@@ -185,6 +249,7 @@ function handleLogout() {
 onMounted(() => {
   fetchParticipants()
   checkActiveSession()
+  fetchLeaderboardTab(activeLeaderboardTab.value)
   
   // Polling for active session status updates
   sessionPoller = setInterval(checkActiveSession, 3000)
@@ -197,7 +262,9 @@ onMounted(() => {
       currentParticipant.value = parsed
       selectedParticipantId.value = parsed.id
       // Restore avatar from participant data
-      if (parsed.avatar?.id) {
+      if (parsed.avatar_id) {
+        selectedAvatarId.value = parsed.avatar_id
+      } else if (parsed.avatar?.id) {
         selectedAvatarId.value = parsed.avatar.id
       }
       fetchHistory(parsed.id)
@@ -289,7 +356,7 @@ onUnmounted(() => {
           </div>
           <div>
             <span class="text-[10px] uppercase font-extrabold tracking-widest text-paragon-light">Masuk Sebagai</span>
-            <h2 class="text-xl font-black text-paragon-ice mt-0.5">{{ currentParticipant.name }}</h2>
+            <h2 class="text-xl font-black bg-clip-text text-transparent bg-gradient-to-r from-paragon-ice to-paragon-light mt-0.5">{{ currentParticipant.name }}</h2>
           </div>
         </div>
         <button 
@@ -339,7 +406,6 @@ onUnmounted(() => {
 
       <!-- No Active Session Card -->
       <div v-else class="bg-dark-surface rounded-3xl p-8 text-center border border-dark-border space-y-3">
-        <HelpCircle class="w-10 h-10 text-paragon-light/40 mx-auto" />
         <h3 class="font-bold text-dark-text text-lg">⏳ Menunggu Sesi Kuis</h3>
         <p class="text-sm text-dark-text-secondary leading-relaxed">
           Sesi kuis live akan muncul di sini setelah Admin memulainya. Bersiaplah untuk berkompetisi! 🏆
@@ -349,9 +415,6 @@ onUnmounted(() => {
       <!-- Personal History Card -->
       <div class="bg-dark-surface rounded-3xl border border-dark-border shadow-xl p-8 space-y-4">
         <div class="flex items-center space-x-3 border-b border-dark-border pb-4">
-          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-paragon-medium to-paragon-dark flex items-center justify-center">
-            <Trophy class="w-5 h-5 text-paragon-ice" />
-          </div>
           <h3 class="font-black text-lg text-paragon-ice">📊 Riwayat Nilai Anda</h3>
         </div>
 
@@ -383,6 +446,147 @@ onUnmounted(() => {
               <div class="text-[10px] font-bold bg-gradient-to-r from-paragon-medium/30 to-paragon-dark/30 text-paragon-ice px-2.5 py-1 rounded-full inline-block border border-paragon-medium/20">
                 🏆 #{{ h.rank }}/{{ h.total_participants }}
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Leaderboard Umum Card with Tabs -->
+      <div class="bg-dark-surface rounded-3xl border border-dark-border shadow-xl p-8 space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-dark-border pb-4 gap-4">
+          <div class="flex items-center space-x-3">
+            <h3 class="font-black text-lg text-paragon-ice">🏆 Peringkat Umum</h3>
+          </div>
+          
+          <!-- Tab Buttons -->
+          <div class="flex bg-dark-surface-hover p-1 rounded-xl border border-dark-border">
+            <button 
+              @click="activeLeaderboardTab = 'weekly'"
+              class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all"
+              :class="activeLeaderboardTab === 'weekly' ? 'bg-gradient-to-r from-paragon-medium to-paragon-dark text-white shadow' : 'text-dark-text-secondary hover:text-white'"
+            >
+              Mingguan
+            </button>
+            <button 
+              @click="activeLeaderboardTab = 'monthly'"
+              class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all"
+              :class="activeLeaderboardTab === 'monthly' ? 'bg-gradient-to-r from-paragon-medium to-paragon-dark text-white shadow' : 'text-dark-text-secondary hover:text-white'"
+            >
+              Bulanan
+            </button>
+            <button 
+              @click="activeLeaderboardTab = 'lifetime'"
+              class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all"
+              :class="activeLeaderboardTab === 'lifetime' ? 'bg-gradient-to-r from-paragon-medium to-paragon-dark text-white shadow' : 'text-dark-text-secondary hover:text-white'"
+            >
+              Lifetime
+            </button>
+          </div>
+        </div>
+
+        <!-- Weekly Leaderboard Table (Latest Quiz Session) -->
+        <div v-if="activeLeaderboardTab === 'weekly'" class="space-y-4">
+          <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4 flex justify-between">
+            <span>Kuis Terakhir</span>
+            <span class="text-paragon-light font-extrabold">{{ weeklyCurrentData?.weekInfo || 'Belum Ada Sesi Kuis Selesai' }}</span>
+          </div>
+          <div class="space-y-2 max-h-80 overflow-y-auto pr-2">
+            <div v-if="!weeklyCurrentData?.leaderboard || weeklyCurrentData.leaderboard.length === 0" class="text-dark-text-secondary text-xs text-center py-6">
+              Belum ada data kuis pekan ini.
+            </div>
+            <div 
+              v-else
+              v-for="(p, idx) in weeklyCurrentData.leaderboard" 
+              :key="p.participant_id"
+              class="flex justify-between items-center px-4 py-3.5 rounded-2xl border text-xs font-bold transition-all"
+              :class="p.participant_id == currentParticipant?.id 
+                ? 'border-accent-cyan bg-gradient-to-r from-cyan-950/30 via-dark-surface to-cyan-950/30 text-white font-extrabold shadow-[0_0_12px_rgba(6,182,212,0.2)]' 
+                : 'border-dark-border bg-dark-surface-hover hover:border-paragon-light/20'"
+            >
+              <div class="flex items-center space-x-3 flex-1 min-w-0">
+                <span class="w-5 text-slate-500 font-extrabold text-[10px]">#{{ idx + 1 }}</span>
+                <span class="truncate text-dark-text leading-tight">{{ p.name }}</span>
+                <span v-if="p.participant_id == currentParticipant?.id" class="text-[8px] bg-gradient-to-r from-accent-cyan to-paragon-medium text-white px-2 py-0.5 rounded-full font-bold ml-2 flex-shrink-0">⭐ Anda</span>
+              </div>
+              <span class="text-xs font-black text-paragon-light">{{ p.total_score }} Pts</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Monthly Leaderboard Table (Weekly Breakdown W1-W5) -->
+        <div v-else-if="activeLeaderboardTab === 'monthly'" class="space-y-4">
+          <!-- Date picker row -->
+          <div class="flex items-center space-x-3 px-4">
+            <label class="text-[10px] font-black text-paragon-light uppercase tracking-widest">Bulan Laporan:</label>
+            <input 
+              v-model="selectedMonthLeaderboard" 
+              type="month" 
+              @change="fetchWeeklyLeaderboard"
+              class="bg-dark-surface border border-dark-border text-dark-text text-[11px] font-bold rounded-lg px-2 py-1 outline-none focus:border-paragon-medium"
+            />
+          </div>
+          <div class="flex items-center justify-between text-[10px] font-black text-paragon-light/60 uppercase tracking-widest px-4">
+            <span>Peserta</span>
+            <div class="flex space-x-3">
+              <span class="w-9 text-center">W1</span>
+              <span class="w-9 text-center">W2</span>
+              <span class="w-9 text-center">W3</span>
+              <span class="w-9 text-center">W4</span>
+              <span class="w-9 text-center">W5</span>
+              <span class="w-12 text-right">Total</span>
+            </div>
+          </div>
+          <div class="space-y-2 max-h-80 overflow-y-auto pr-2">
+            <div v-if="weeklyLeaderboard.length === 0" class="text-dark-text-secondary text-xs text-center py-6">
+              Tidak ada data untuk bulan ini.
+            </div>
+            <div 
+              v-else
+              v-for="(p, idx) in weeklyLeaderboard" 
+              :key="p.participant_id"
+              class="flex justify-between items-center px-4 py-3.5 rounded-2xl border text-xs font-bold transition-all"
+              :class="p.participant_id == currentParticipant?.id 
+                ? 'border-accent-cyan bg-gradient-to-r from-cyan-950/30 via-dark-surface to-cyan-950/30 text-white font-extrabold shadow-[0_0_12px_rgba(6,182,212,0.2)]' 
+                : 'border-dark-border bg-dark-surface-hover hover:border-paragon-light/20'"
+            >
+              <div class="flex items-center space-x-3 flex-1 min-w-0">
+                <span class="w-5 text-slate-500 font-extrabold text-[10px]">#{{ idx + 1 }}</span>
+                <span class="truncate text-dark-text leading-tight">{{ p.name }}</span>
+                <span v-if="p.participant_id == currentParticipant?.id" class="text-[8px] bg-gradient-to-r from-accent-cyan to-paragon-medium text-white px-2 py-0.5 rounded-full font-bold ml-2 flex-shrink-0">⭐ Anda</span>
+              </div>
+              <div class="flex space-x-3 text-[10px] font-bold text-slate-400">
+                <span class="w-9 text-center">{{ p.weeks[0] || '-' }}</span>
+                <span class="w-9 text-center">{{ p.weeks[1] || '-' }}</span>
+                <span class="w-9 text-center">{{ p.weeks[2] || '-' }}</span>
+                <span class="w-9 text-center">{{ p.weeks[3] || '-' }}</span>
+                <span class="w-9 text-center">{{ p.weeks[4] || '-' }}</span>
+                <span class="w-12 text-right text-xs font-black text-paragon-light">{{ p.total }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Lifetime Leaderboard Table -->
+        <div v-else-if="activeLeaderboardTab === 'lifetime'" class="space-y-3">
+          <div class="flex justify-between items-center text-[10px] font-black text-paragon-light/60 uppercase tracking-widest px-4">
+            <span>Peserta</span>
+            <span>Skor</span>
+          </div>
+          <div class="space-y-2 max-h-80 overflow-y-auto pr-2">
+            <div 
+              v-for="(p, idx) in lifetimeLeaderboard" 
+              :key="p.participant_id"
+              class="flex justify-between items-center px-4 py-3 rounded-2xl border text-xs font-bold transition-all"
+              :class="p.participant_id == currentParticipant?.id 
+                ? 'border-accent-cyan bg-gradient-to-r from-cyan-950/30 via-dark-surface to-cyan-950/30 text-white font-extrabold shadow-[0_0_12px_rgba(6,182,212,0.2)]' 
+                : 'border-dark-border bg-dark-surface-hover hover:border-paragon-light/20'"
+            >
+              <div class="flex items-center space-x-3 flex-1 min-w-0">
+                <span class="w-5 text-slate-500 font-extrabold text-[10px]">#{{ idx + 1 }}</span>
+                <span class="text-dark-text truncate leading-tight">{{ p.name }}</span>
+                <span v-if="p.participant_id == currentParticipant?.id" class="text-[8px] bg-gradient-to-r from-accent-cyan to-paragon-medium text-white px-2 py-0.5 rounded-full font-bold ml-2 flex-shrink-0">⭐ Anda</span>
+              </div>
+              <span class="text-xs font-black text-paragon-light">{{ p.lifetime_score }} Pts</span>
             </div>
           </div>
         </div>
@@ -419,6 +623,9 @@ onUnmounted(() => {
             <div class="flex items-center space-x-3 font-bold flex-1">
               <div class="w-6 h-6 rounded-lg bg-gradient-to-br from-paragon-medium to-paragon-dark flex items-center justify-center text-paragon-ice font-black text-[10px]">
                 #{{ idx + 1 }}
+              </div>
+              <div class="w-6 h-6 rounded-full bg-slate-800 border border-white/10 overflow-hidden flex items-center justify-center flex-shrink-0">
+                <img :src="`/assets/avatars/${getAvatarFileName(p)}`" class="w-full h-full object-cover" />
               </div>
               <span class="text-dark-text">{{ p.name }}</span>
               <span v-if="p.participant_id == currentParticipant?.id" class="text-[9px] bg-gradient-to-r from-paragon-medium to-paragon-dark text-paragon-ice px-2 py-0.5 rounded-full font-bold">⭐ Anda</span>
