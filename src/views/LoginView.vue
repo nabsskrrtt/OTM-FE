@@ -246,6 +246,28 @@ function handleLogout() {
   personalHistory.value = []
 }
 
+function getTopThreeAndMe(list) {
+  if (!list || !Array.isArray(list)) return []
+  // Slice Top 3
+  const topThree = list.slice(0, 3)
+  
+  if (currentParticipant.value) {
+    const myId = currentParticipant.value.id
+    // Check if I am in the top 3 (by id or participant_id)
+    const inTopThree = topThree.some(p => p.participant_id == myId || p.id == myId)
+    if (!inTopThree) {
+      // Find my row in the full list
+      const myRowIndex = list.findIndex(p => p.participant_id == myId || p.id == myId)
+      if (myRowIndex !== -1) {
+        // Return top 3 plus my row flagged as isPinnedMe
+        const myRow = { ...list[myRowIndex], isPinnedMe: true, actualRank: myRowIndex + 1 }
+        return [...topThree, myRow]
+      }
+    }
+  }
+  return topThree
+}
+
 onMounted(() => {
   fetchParticipants()
   checkActiveSession()
@@ -493,22 +515,24 @@ onUnmounted(() => {
             <div v-if="!weeklyCurrentData?.leaderboard || weeklyCurrentData.leaderboard.length === 0" class="text-dark-text-secondary text-xs text-center py-6">
               Belum ada data kuis pekan ini.
             </div>
-            <div 
-              v-else
-              v-for="(p, idx) in weeklyCurrentData.leaderboard" 
-              :key="p.participant_id"
-              class="flex justify-between items-center px-4 py-3.5 rounded-2xl border text-xs font-bold transition-all"
-              :class="p.participant_id == currentParticipant?.id 
-                ? 'border-accent-cyan bg-gradient-to-r from-cyan-950/30 via-dark-surface to-cyan-950/30 text-white font-extrabold shadow-[0_0_12px_rgba(6,182,212,0.2)]' 
-                : 'border-dark-border bg-dark-surface-hover hover:border-paragon-light/20'"
-            >
-              <div class="flex items-center space-x-3 flex-1 min-w-0">
-                <span class="w-5 text-slate-500 font-extrabold text-[10px]">#{{ idx + 1 }}</span>
-                <span class="truncate text-dark-text leading-tight">{{ p.name }}</span>
-                <span v-if="p.participant_id == currentParticipant?.id" class="text-[8px] bg-gradient-to-r from-accent-cyan to-paragon-medium text-white px-2 py-0.5 rounded-full font-bold ml-2 flex-shrink-0">⭐ Anda</span>
+            <template v-else v-for="(p, idx) in getTopThreeAndMe(weeklyCurrentData.leaderboard)" :key="p.participant_id">
+              <div v-if="p.isPinnedMe" class="border-t border-dashed border-dark-border/60 my-3 pt-3 text-center text-[10px] text-paragon-light/60 uppercase tracking-widest font-black">
+                Posisi Anda
               </div>
-              <span class="text-xs font-black text-paragon-light">{{ p.total_score }} Pts</span>
-            </div>
+              <div 
+                class="flex justify-between items-center px-4 py-3.5 rounded-2xl border text-xs font-bold transition-all"
+                :class="p.participant_id == currentParticipant?.id 
+                  ? 'border-accent-cyan bg-gradient-to-r from-cyan-950/30 via-dark-surface to-cyan-950/30 text-white font-extrabold shadow-[0_0_12px_rgba(6,182,212,0.2)]' 
+                  : 'border-dark-border bg-dark-surface-hover hover:border-paragon-light/20'"
+              >
+                <div class="flex items-center space-x-3 flex-1 min-w-0">
+                  <span class="w-5 text-slate-500 font-extrabold text-[10px]">#{{ p.actualRank || (idx + 1) }}</span>
+                  <span class="truncate text-dark-text leading-tight">{{ p.name }}</span>
+                  <span v-if="p.participant_id == currentParticipant?.id" class="text-[8px] bg-gradient-to-r from-accent-cyan to-paragon-medium text-white px-2 py-0.5 rounded-full font-bold ml-2 flex-shrink-0">⭐ Anda</span>
+                </div>
+                <span class="text-xs font-black text-paragon-light">{{ p.total_score }} Pts</span>
+              </div>
+            </template>
           </div>
         </div>
 
@@ -543,29 +567,31 @@ onUnmounted(() => {
                 <div v-if="weeklyLeaderboard.length === 0" class="text-dark-text-secondary text-xs text-center py-6">
                   Tidak ada data untuk bulan ini.
                 </div>
-                <div 
-                  v-else
-                  v-for="(p, idx) in weeklyLeaderboard" 
-                  :key="p.participant_id"
-                  class="flex justify-between items-center px-4 py-3.5 rounded-2xl border text-xs font-bold transition-all"
-                  :class="p.participant_id == currentParticipant?.id 
-                    ? 'border-accent-cyan bg-gradient-to-r from-cyan-950/30 via-dark-surface to-cyan-950/30 text-white font-extrabold shadow-[0_0_12px_rgba(6,182,212,0.2)]' 
-                    : 'border-dark-border bg-dark-surface-hover hover:border-paragon-light/20'"
-                >
-                  <div class="flex items-center space-x-3 flex-1 min-w-0 pr-4">
-                    <span class="w-5 text-slate-500 font-extrabold text-[10px]">#{{ idx + 1 }}</span>
-                    <span class="truncate text-dark-text leading-tight">{{ p.name }}</span>
-                    <span v-if="p.participant_id == currentParticipant?.id" class="text-[8px] bg-gradient-to-r from-accent-cyan to-paragon-medium text-white px-2 py-0.5 rounded-full font-bold ml-2 flex-shrink-0">⭐ Anda</span>
+                <template v-else v-for="(p, idx) in getTopThreeAndMe(weeklyLeaderboard)" :key="p.participant_id">
+                  <div v-if="p.isPinnedMe" class="border-t border-dashed border-dark-border/60 my-3 pt-3 text-center text-[10px] text-paragon-light/60 uppercase tracking-widest font-black">
+                    Posisi Anda
                   </div>
-                  <div class="flex space-x-3 text-[10px] font-bold text-slate-400 flex-shrink-0">
-                    <span class="w-9 text-center">{{ p.weeks[0] || '-' }}</span>
-                    <span class="w-9 text-center">{{ p.weeks[1] || '-' }}</span>
-                    <span class="w-9 text-center">{{ p.weeks[2] || '-' }}</span>
-                    <span class="w-9 text-center">{{ p.weeks[3] || '-' }}</span>
-                    <span class="w-9 text-center">{{ p.weeks[4] || '-' }}</span>
-                    <span class="w-12 text-right text-xs font-black text-paragon-light">{{ p.total }}</span>
+                  <div 
+                    class="flex justify-between items-center px-4 py-3.5 rounded-2xl border text-xs font-bold transition-all"
+                    :class="p.participant_id == currentParticipant?.id 
+                      ? 'border-accent-cyan bg-gradient-to-r from-cyan-950/30 via-dark-surface to-cyan-950/30 text-white font-extrabold shadow-[0_0_12px_rgba(6,182,212,0.2)]' 
+                      : 'border-dark-border bg-dark-surface-hover hover:border-paragon-light/20'"
+                  >
+                    <div class="flex items-center space-x-3 flex-1 min-w-0 pr-4">
+                      <span class="w-5 text-slate-500 font-extrabold text-[10px]">#{{ p.actualRank || (idx + 1) }}</span>
+                      <span class="truncate text-dark-text leading-tight">{{ p.name }}</span>
+                      <span v-if="p.participant_id == currentParticipant?.id" class="text-[8px] bg-gradient-to-r from-accent-cyan to-paragon-medium text-white px-2 py-0.5 rounded-full font-bold ml-2 flex-shrink-0">⭐ Anda</span>
+                    </div>
+                    <div class="flex space-x-3 text-[10px] font-bold text-slate-400 flex-shrink-0">
+                      <span class="w-9 text-center">{{ p.weeks[0] || '-' }}</span>
+                      <span class="w-9 text-center">{{ p.weeks[1] || '-' }}</span>
+                      <span class="w-9 text-center">{{ p.weeks[2] || '-' }}</span>
+                      <span class="w-9 text-center">{{ p.weeks[3] || '-' }}</span>
+                      <span class="w-9 text-center">{{ p.weeks[4] || '-' }}</span>
+                      <span class="w-12 text-right text-xs font-black text-paragon-light">{{ p.total }}</span>
+                    </div>
                   </div>
-                </div>
+                </template>
               </div>
             </div>
           </div>
@@ -578,21 +604,24 @@ onUnmounted(() => {
             <span>Skor</span>
           </div>
           <div class="space-y-2 max-h-80 overflow-y-auto pr-2">
-            <div 
-              v-for="(p, idx) in lifetimeLeaderboard" 
-              :key="p.participant_id"
-              class="flex justify-between items-center px-4 py-3 rounded-2xl border text-xs font-bold transition-all"
-              :class="p.participant_id == currentParticipant?.id 
-                ? 'border-accent-cyan bg-gradient-to-r from-cyan-950/30 via-dark-surface to-cyan-950/30 text-white font-extrabold shadow-[0_0_12px_rgba(6,182,212,0.2)]' 
-                : 'border-dark-border bg-dark-surface-hover hover:border-paragon-light/20'"
-            >
-              <div class="flex items-center space-x-3 flex-1 min-w-0">
-                <span class="w-5 text-slate-500 font-extrabold text-[10px]">#{{ idx + 1 }}</span>
-                <span class="text-dark-text truncate leading-tight">{{ p.name }}</span>
-                <span v-if="p.participant_id == currentParticipant?.id" class="text-[8px] bg-gradient-to-r from-accent-cyan to-paragon-medium text-white px-2 py-0.5 rounded-full font-bold ml-2 flex-shrink-0">⭐ Anda</span>
+            <template v-for="(p, idx) in getTopThreeAndMe(lifetimeLeaderboard)" :key="p.participant_id">
+              <div v-if="p.isPinnedMe" class="border-t border-dashed border-dark-border/60 my-3 pt-3 text-center text-[10px] text-paragon-light/60 uppercase tracking-widest font-black">
+                Posisi Anda
               </div>
-              <span class="text-xs font-black text-paragon-light">{{ p.lifetime_score }} Pts</span>
-            </div>
+              <div 
+                class="flex justify-between items-center px-4 py-3 rounded-2xl border text-xs font-bold transition-all"
+                :class="p.participant_id == currentParticipant?.id 
+                  ? 'border-accent-cyan bg-gradient-to-r from-cyan-950/30 via-dark-surface to-cyan-950/30 text-white font-extrabold shadow-[0_0_12px_rgba(6,182,212,0.2)]' 
+                  : 'border-dark-border bg-dark-surface-hover hover:border-paragon-light/20'"
+              >
+                <div class="flex items-center space-x-3 flex-1 min-w-0">
+                  <span class="w-5 text-slate-500 font-extrabold text-[10px]">#{{ p.actualRank || (idx + 1) }}</span>
+                  <span class="text-dark-text truncate leading-tight">{{ p.name }}</span>
+                  <span v-if="p.participant_id == currentParticipant?.id" class="text-[8px] bg-gradient-to-r from-accent-cyan to-paragon-medium text-white px-2 py-0.5 rounded-full font-bold ml-2 flex-shrink-0">⭐ Anda</span>
+                </div>
+                <span class="text-xs font-black text-paragon-light">{{ p.lifetime_score }} Pts</span>
+              </div>
+            </template>
           </div>
         </div>
       </div>
@@ -617,29 +646,32 @@ onUnmounted(() => {
         </div>
 
         <div class="space-y-2 max-h-80 overflow-y-auto pr-2">
-          <div 
-            v-for="(p, idx) in historyLeaderboard" 
-            :key="p.participant_id" 
-            class="flex justify-between items-center px-4 py-3 rounded-2xl border text-xs transition-all"
-            :class="p.participant_id == currentParticipant?.id 
-              ? 'border-paragon-medium bg-paragon-medium/10 text-paragon-ice font-extrabold shadow-lg shadow-paragon-medium/20' 
-              : 'border-dark-border bg-dark-surface-hover hover:border-paragon-light/30'"
-          >
-            <div class="flex items-center space-x-3 font-bold flex-1">
-              <div class="w-6 h-6 rounded-lg bg-gradient-to-br from-paragon-medium to-paragon-dark flex items-center justify-center text-paragon-ice font-black text-[10px]">
-                #{{ idx + 1 }}
-              </div>
-              <div class="w-6 h-6 rounded-full bg-slate-800 border border-white/10 overflow-hidden flex items-center justify-center flex-shrink-0">
-                <img :src="`/assets/avatars/${getAvatarFileName(p)}`" class="w-full h-full object-cover" />
-              </div>
-              <span class="text-dark-text">{{ p.name }}</span>
-              <span v-if="p.participant_id == currentParticipant?.id" class="text-[9px] bg-gradient-to-r from-paragon-medium to-paragon-dark text-paragon-ice px-2 py-0.5 rounded-full font-bold">⭐ Anda</span>
+          <template v-for="(p, idx) in getTopThreeAndMe(historyLeaderboard)" :key="p.participant_id">
+            <div v-if="p.isPinnedMe" class="border-t border-dashed border-dark-border/60 my-3 pt-3 text-center text-[10px] text-paragon-light/60 uppercase tracking-widest font-black">
+              Posisi Anda
             </div>
-            <div class="text-right">
-              <div class="font-black text-paragon-light">{{ p.total_score }}⭐</div>
-              <div class="text-[9px] text-dark-text-secondary font-medium">✅ {{ p.correct_answers }}/{{ p.total_answered }}</div>
+            <div 
+              class="flex justify-between items-center px-4 py-3 rounded-2xl border text-xs transition-all"
+              :class="p.participant_id == currentParticipant?.id 
+                ? 'border-paragon-medium bg-paragon-medium/10 text-paragon-ice font-extrabold shadow-lg shadow-paragon-medium/20' 
+                : 'border-dark-border bg-dark-surface-hover hover:border-paragon-light/30'"
+            >
+              <div class="flex items-center space-x-3 font-bold flex-1">
+                <div class="w-6 h-6 rounded-lg bg-gradient-to-br from-paragon-medium to-paragon-dark flex items-center justify-center text-paragon-ice font-black text-[10px]">
+                  #{{ p.actualRank || (idx + 1) }}
+                </div>
+                <div class="w-6 h-6 rounded-full bg-slate-800 border border-white/10 overflow-hidden flex items-center justify-center flex-shrink-0">
+                  <img :src="`/assets/avatars/${getAvatarFileName(p)}`" class="w-full h-full object-cover" />
+                </div>
+                <span class="text-dark-text">{{ p.name }}</span>
+                <span v-if="p.participant_id == currentParticipant?.id" class="text-[9px] bg-gradient-to-r from-paragon-medium to-paragon-dark text-paragon-ice px-2 py-0.5 rounded-full font-bold">⭐ Anda</span>
+              </div>
+              <div class="text-right">
+                <div class="font-black text-paragon-light">{{ p.total_score }}⭐</div>
+                <div class="text-[9px] text-dark-text-secondary font-medium">✅ {{ p.correct_answers }}/{{ p.total_answered }}</div>
+              </div>
             </div>
-          </div>
+          </template>
         </div>
 
         <button 

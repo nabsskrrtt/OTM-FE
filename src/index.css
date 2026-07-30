@@ -255,3 +255,20 @@ html {
   border-color: #FCA5A5 !important;
 }
 
+/* Day Mode Cyan Alert / Notification Contrast Enhancements */
+.day-mode .bg-cyan-950\/20 {
+  background-color: #E0F2FE !important; /* soft sky-100 bg */
+  color: #0369A1 !important; /* sky-700 text */
+}
+.day-mode .border-cyan-500\/30 {
+  border-color: #7DD3FC !important; /* sky-300 border */
+}
+.day-mode .text-cyan-200 {
+  color: #0369A1 !important; /* sky-700 text */
+}
+
+.day-mode .text-accent-cyan {
+  color: #0891B2 !important; /* high-contrast cyan-600 */
+}
+
+

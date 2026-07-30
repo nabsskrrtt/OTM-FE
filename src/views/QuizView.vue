@@ -97,8 +97,8 @@ async function sendReaction(emoji) {
 async function fetchActiveSession() {
   try {
     const url = participant.value
-      ? `${API_BASE}/sessions/active?participant_id=${participant.value.id}&include_finished=true`
-      : `${API_BASE}/sessions/active?include_finished=true`
+      ? `${API_BASE}/sessions/active?participant_id=${participant.value.id}&include_finished=true&t=${Date.now()}`
+      : `${API_BASE}/sessions/active?include_finished=true&t=${Date.now()}`
     const res = await fetch(url)
     if (!res.ok) return
 
@@ -293,7 +293,7 @@ async function submitAnswer(answerText) {
 async function fetchLeaderboard() {
   if (!sessionData.value) return
   try {
-    const res = await fetch(`${API_BASE}/admin/sessions/${sessionData.value.id}/active-stats`)
+    const res = await fetch(`${API_BASE}/admin/sessions/${sessionData.value.id}/active-stats?t=${Date.now()}`)
     if (res.ok) {
       const data = await res.json()
       leaderboard.value = data.participants || []
@@ -478,7 +478,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Immersive Leaderboard Component -->
-        <ImmersiveLeaderboard :leaderboard="leaderboard" :currentParticipantId="participant?.id" />
+        <ImmersiveLeaderboard :leaderboard="leaderboard" :currentParticipantId="participant?.id" :hideOthers="true" />
 
         <div class="text-center py-4 space-y-2 border-t border-slate-100">
           <span class="inline-block w-5 h-5 border-2 border-slate-200 border-t-paragon-medium rounded-full animate-spin"></span>
@@ -717,7 +717,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Immersive Final Leaderboard -->
-      <ImmersiveLeaderboard :leaderboard="leaderboard" :currentParticipantId="participant?.id" />
+      <ImmersiveLeaderboard :leaderboard="leaderboard" :currentParticipantId="participant?.id" :revealAnimation="true" :disableAudio="true" />
 
       <button 
         @click="router.push('/')" 

@@ -14,8 +14,17 @@ const API_HOST = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 const API_BASE = `${API_HOST}/api`
 const locationOrigin = window.location.origin
 
+const isDayMode = ref(localStorage.getItem('otm_theme') === 'day')
+let themeObserver = null
+
 // Auth Check
 onMounted(() => {
+  // Setup reactive theme observer
+  themeObserver = new MutationObserver(() => {
+    isDayMode.value = document.documentElement.classList.contains('day-mode')
+  })
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+
   const token = localStorage.getItem('otm_admin_token')
   if (!token) {
     router.push('/admin/login')
@@ -38,6 +47,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  if (themeObserver) themeObserver.disconnect()
   if (pollInterval) clearInterval(pollInterval)
   if (presentationSyncInterval) clearInterval(presentationSyncInterval)
   if (presentationTimerInterval) clearInterval(presentationTimerInterval)
@@ -349,7 +359,7 @@ async function fetchLiveStats() {
     return
   }
   try {
-    const res = await fetch(`${API_BASE}/admin/sessions/${activeSession.value.id}/active-stats`)
+    const res = await fetch(`${API_BASE}/admin/sessions/${activeSession.value.id}/active-stats?t=${Date.now()}`)
     if (res.ok) {
       liveStats.value = await res.json()
       
@@ -367,7 +377,7 @@ async function fetchLiveStats() {
       }
 
       // Sync presentation timer when question index changes
-      if (liveStats.value.session_status === 'active' && liveStats.value.submissions) {
+      if (liveStats.value.session_status === 'active' && liveStats.value.submissions && !activeSession.value?.show_leaderboard) {
         const qId = liveStats.value.submissions.question_id
         if (currentQuestionIdForTimer !== qId) {
           currentQuestionIdForTimer = qId
@@ -376,6 +386,9 @@ async function fetchLiveStats() {
           const limit = currentQ ? currentQ.time_limit : 20
           startPresentationTimer(limit)
         }
+      } else {
+        stopPresentationTimer()
+        currentQuestionIdForTimer = null
       }
       
       // If server finished the session, sync locally
@@ -401,7 +414,7 @@ async function fetchMonthlyLeaderboard() {
 // Active session polling for presentation tab opened in separate window
 async function fetchActiveSessionForPresentation() {
   try {
-    const res = await fetch(`${API_BASE}/sessions/active?include_finished=true`)
+    const res = await fetch(`${API_BASE}/sessions/active?include_finished=true&t=${Date.now()}`)
     if (res.ok) {
       const data = await res.json()
       
@@ -424,8 +437,14 @@ async function fetchActiveSessionForPresentation() {
         if (questions.value.length === 0 || questions.value[0]?.session_id !== data.session.id) {
           fetchQuestions(data.session.id)
         }
+        if (data.session.show_leaderboard || data.session.status === 'finished') {
+          stopPresentationTimer()
+          currentQuestionIdForTimer = null
+        }
       } else {
         activeSession.value = null
+        stopPresentationTimer()
+        currentQuestionIdForTimer = null
       }
       syncPresentationAudioState(activeSession.value)
     }
@@ -462,6 +481,13 @@ function startPresentationTimer(limit) {
       clearInterval(presentationTimerInterval)
     }
   }, 100)
+}
+
+function stopPresentationTimer() {
+  if (presentationTimerInterval) {
+    clearInterval(presentationTimerInterval)
+    presentationTimerInterval = null
+  }
 }
 
 // ----------------------------------------------------
@@ -958,25 +984,27 @@ function getOptionSubmitPercentage(option) {
     <!-- PRESENTATION SCREEN OVERLAY (SCREENSHARE SAFE) -->
     <div 
       v-if="showPresentationMode" 
-      class="fixed inset-0 bg-slate-950 text-white z-50 flex flex-col items-center justify-center p-6 md:p-12 overflow-hidden"
+      class="fixed inset-0 bg-dark-bg text-dark-text z-[100] flex flex-col overflow-y-auto"
     >
       <!-- Emoji Reactions Overlay Container -->
-      <div id="emoji-reactions-container" class="fixed inset-0 pointer-events-none z-50 overflow-hidden"></div>
+      <div id="emoji-reactions-container" class="fixed inset-0 pointer-events-none z-[100] overflow-hidden"></div>
+      
       <!-- Presentation Top Bar (Consistent with Main Navbar) -->
-      <div class="bg-slate-900 border-b border-white/5 px-6 py-4 flex items-center justify-between w-full">
+      <div class="glass border-b border-paragon-light/10 px-6 py-4 flex items-center justify-between w-full flex-shrink-0">
         <div class="flex items-center space-x-4">
-          <div class="relative group">
-            <img src="/paragon-mark.png" alt="Paragon" class="h-10 w-auto object-contain filter brightness-0 invert" />
+          <!-- Logo Triangle Mark Wrapper with fixed dimensions to prevent layout shift -->
+          <div class="relative group w-10 h-10 flex items-center justify-center flex-shrink-0">
+            <img :src="isDayMode ? '/paragon-mark-blue.png' : '/paragon-mark.png'" alt="Paragon" class="h-10 w-auto max-w-full object-contain hover:scale-110 transition-transform duration-300" :class="isDayMode ? '' : 'filter brightness-0 invert'" />
           </div>
           <div>
-            <h1 class="font-black tracking-wider text-sm md:text-base bg-clip-text text-transparent bg-gradient-to-r from-accent-cyan via-paragon-light to-paragon-ice drop-shadow-[0_0_8px_rgba(34,211,238,0.4)]">Own The Morning</h1>
+            <h1 class="font-black tracking-wider text-sm md:text-base bg-clip-text text-transparent bg-gradient-to-r drop-shadow-[0_0_8px_rgba(34,211,238,0.4)]" :class="isDayMode ? 'from-paragon-medium via-paragon-dark to-paragon-medium' : 'from-accent-cyan via-paragon-light to-paragon-ice'">Own The Morning</h1>
             <span class="text-[8px] md:text-[9px] text-accent-cyan font-bold tracking-widest block leading-none">ETRM (Live Presentasi)</span>
           </div>
         </div>
         
         <button 
           @click="showPresentationMode = false" 
-          class="px-4 py-2 border border-white/10 bg-white/5 hover:bg-white/15 text-white/80 hover:text-white rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5"
+          class="px-4 py-2 border border-dark-border bg-dark-surface-hover hover:bg-dark-surface text-dark-text rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer"
         >
           <Minimize2 class="w-3.5 h-3.5" />
           <span>Tutup Layar Presentasi</span>
@@ -984,12 +1012,12 @@ function getOptionSubmitPercentage(option) {
       </div>
 
       <!-- Presenter View body -->
-      <div class="flex-1 flex flex-col p-6 md:p-12 items-center justify-center min-h-[80vh]">
+      <div class="flex-1 w-full max-w-7xl mx-auto flex flex-col p-6 md:p-12 items-center justify-center min-h-[85vh]">
         <!-- NO SESSION RUNNING -->
         <div v-if="!activeSession" class="text-center space-y-3 animate-pulse">
           <div class="text-slate-500 text-6xl">📺</div>
-          <h2 class="text-2xl font-black text-slate-300">Menunggu Inisialisasi Kuis</h2>
-          <p class="text-xs text-slate-400 max-w-sm">PIC sedang menyiapkan sesi kuis OTM minggu ini di dashboard kontrol.</p>
+          <h2 class="text-2xl font-black text-dark-text-secondary">Menunggu Inisialisasi Kuis</h2>
+          <p class="text-xs text-dark-text-secondary max-w-sm">PIC sedang menyiapkan sesi kuis OTM minggu ini di dashboard kontrol.</p>
         </div>
 
         <!-- 1. WAITING LOBBY / ROOM (index = -1) -->
@@ -998,46 +1026,46 @@ function getOptionSubmitPercentage(option) {
           class="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-8 items-center"
         >
           <!-- Left side: Invitation QR Code directly linking to /quiz -->
-          <div class="bg-white text-slate-900 p-8 rounded-3xl shadow-2xl border border-white/10 text-center space-y-6 flex flex-col items-center" style="background-color: #0f172a;">
-            <h3 class="text-lg font-black text-slate-100 tracking-tight uppercase">Pindai &amp; Gabung Kuis</h3>
-            <div class="p-3 bg-[#0f172a] rounded-2xl border border-white/5 flex items-center justify-center shadow-2xl">
+          <div class="bg-dark-surface text-dark-text p-8 rounded-3xl shadow-2xl border border-dark-border text-center space-y-6 flex flex-col items-center">
+            <h3 class="text-lg font-black text-dark-text tracking-tight uppercase">Pindai &amp; Gabung Kuis</h3>
+            <div class="p-3 bg-white rounded-2xl border border-dark-border flex items-center justify-center shadow-2xl">
               <img :src="qrJoinUrl" alt="QR Join link to /quiz" class="w-60 h-60 object-contain" />
             </div>
             <div class="space-y-1">
-              <span class="text-[10px] font-black tracking-widest text-slate-400 uppercase">Tautan Akses</span>
+              <span class="text-[10px] font-black tracking-widest text-dark-text-secondary uppercase">Tautan Akses</span>
               <p class="font-bold text-sm text-paragon-medium underline select-text">{{ locationOrigin }}/</p>
             </div>
           </div>
 
           <!-- Right side: Session Meta & Connected List -->
-          <div class="space-y-6 bg-slate-900/50 p-6 md:p-8 rounded-3xl border border-white/5">
+          <div class="space-y-6 bg-dark-surface p-6 md:p-8 rounded-3xl border border-dark-border shadow-xl">
             <div class="space-y-2">
-              <div class="flex items-center space-x-2 bg-white/10 px-3 py-1 rounded-full w-max text-[9px] font-black tracking-widest uppercase">
+              <div class="flex items-center space-x-2 bg-dark-surface-hover border border-dark-border px-3 py-1 rounded-full w-max text-[9px] font-black tracking-widest uppercase">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                 <span>Pendaftaran Live</span>
               </div>
               <h2 class="text-3xl font-black tracking-tight leading-tight">OTM: {{ activeSession.reference || 'Sharing Session' }}</h2>
-              <p class="text-xs text-slate-400 font-semibold">
+              <p class="text-xs text-dark-text-secondary font-semibold">
                 PIC: {{ activeSession.pic_karyawan }} &amp; {{ activeSession.pic_intern }} • Tanggal: {{ activeSession.date }}
               </p>
             </div>
 
             <!-- Joined Grid -->
-            <div class="space-y-3 pt-4 border-t border-white/5">
-              <h3 class="text-xs font-black uppercase text-slate-400 tracking-wider">
+            <div class="space-y-3 pt-4 border-t border-dark-border">
+              <h3 class="text-xs font-black uppercase text-dark-text-secondary tracking-wider">
                 Peserta Masuk (Total: {{ liveStats?.participants?.length || 0 }})
               </h3>
               
-              <div v-if="!liveStats?.participants || liveStats.participants.length === 0" class="text-slate-400 text-xs font-semibold py-8 text-center border border-dashed border-white/10 rounded-2xl bg-white/5">
+              <div v-if="!liveStats?.participants || liveStats.participants.length === 0" class="text-dark-text-secondary text-xs font-semibold py-8 text-center border border-dashed border-dark-border rounded-2xl bg-dark-surface-hover">
                 Menunggu peserta memindai QR Code...
               </div>
               <div v-else class="grid grid-cols-2 md:grid-cols-3 gap-2.5 max-h-60 overflow-y-auto pr-1">
                 <div 
                   v-for="p in liveStats.participants" 
                   :key="p.id" 
-                  class="px-3.5 py-2 bg-white/5 border border-white/5 hover:bg-white/10 rounded-xl text-xs font-bold flex items-center space-x-2.5 text-slate-200 transition-all animate-pulse"
+                  class="px-3.5 py-2 bg-dark-surface-hover border border-dark-border hover:bg-dark-surface rounded-xl text-xs font-bold flex items-center space-x-2.5 text-dark-text transition-all animate-pulse"
                 >
-                  <div class="w-6 h-6 rounded-full overflow-hidden flex-shrink-0 bg-slate-800 border border-white/10">
+                  <div class="w-6 h-6 rounded-full overflow-hidden flex-shrink-0 bg-dark-surface border border-dark-border">
                     <img :src="`/assets/avatars/${getAvatarFileName(p)}`" :alt="p.name" class="w-full h-full object-cover" />
                   </div>
                   <span class="truncate">{{ p.name }}</span>
@@ -1053,11 +1081,11 @@ function getOptionSubmitPercentage(option) {
           class="w-full max-w-7xl space-y-8 px-4"
         >
           <!-- 2a. TEMPORARY LEADERBOARD -->
-          <div v-if="activeSession.show_leaderboard" class="w-full max-w-5xl space-y-8 text-center mx-auto bg-slate-900 border border-white/5 p-8 md:p-12 rounded-3xl shadow-2xl animate-fade-in">
+          <div v-if="activeSession.show_leaderboard" class="w-full max-w-5xl space-y-8 text-center mx-auto bg-dark-surface border border-dark-border p-8 md:p-12 rounded-3xl shadow-2xl animate-fade-in">
             <div class="space-y-3">
               <Trophy class="w-16 h-16 text-amber-500 mx-auto animate-bounce" />
-              <h2 class="text-4xl font-black text-white tracking-tight animate-pulse">Leaderboard Sementara</h2>
-              <p class="text-slate-400 text-sm max-w-md mx-auto">Posisi sementara setelah Soal {{ activeSession.current_question_index + 1 }}!</p>
+              <h2 class="text-4xl font-black text-dark-text tracking-tight animate-pulse">Leaderboard Sementara</h2>
+              <p class="text-dark-text-secondary text-sm max-w-md mx-auto">Posisi sementara setelah Soal {{ activeSession.current_question_index + 1 }}!</p>
             </div>
 
             <!-- Immersive Leaderboard (Synchronized styling with participant view) -->
@@ -1068,14 +1096,14 @@ function getOptionSubmitPercentage(option) {
 
           <!-- 2b. The Active Question -->
           <div v-else class="space-y-6">
-            <div class="flex items-center justify-between text-xs font-black uppercase tracking-widest text-slate-400">
+            <div class="flex items-center justify-between text-xs font-black uppercase tracking-widest text-dark-text-secondary">
               <span>Pertanyaan {{ activeSession.current_question_index + 1 }} dari {{ questions.length }}</span>
-              <span class="px-2.5 py-1 bg-white/10 text-white rounded font-extrabold">{{ questions[activeSession.current_question_index]?.points }} Poin</span>
+              <span class="px-2.5 py-1 bg-dark-surface border border-dark-border text-dark-text rounded font-extrabold">{{ questions[activeSession.current_question_index]?.points }} Poin</span>
             </div>
 
-            <div class="bg-slate-900 border border-white/5 rounded-3xl shadow-2xl overflow-hidden space-y-0">
+            <div class="bg-dark-surface border border-dark-border rounded-3xl shadow-2xl overflow-hidden space-y-0">
               <!-- Presentation Timer Progress Bar -->
-              <div class="h-2.5 bg-white/5 w-full overflow-hidden">
+              <div class="h-2.5 bg-dark-surface-hover w-full overflow-hidden">
                 <div 
                   class="h-full bg-gradient-to-r transition-all duration-100" 
                   :class="presentationTimeLeft <= 5 ? 'from-red-500 to-red-600 bg-red-500' : 'from-accent-cyan to-paragon-medium bg-paragon-medium shadow-[0_0_8px_rgba(6,182,212,0.5)]'"
@@ -1085,14 +1113,14 @@ function getOptionSubmitPercentage(option) {
 
               <div class="p-8 md:p-12 space-y-8">
                 <!-- Time Indicator (If active) -->
-                <div class="flex justify-between items-center pb-6 border-b border-white/5 gap-4">
-                  <h3 class="text-2xl md:text-4xl font-black text-white leading-snug flex-1 mr-4">
+                <div class="flex justify-between items-center pb-6 border-b border-dark-border gap-4">
+                  <h3 class="text-2xl md:text-4xl font-black text-dark-text leading-snug flex-1 mr-4">
                     {{ questions[activeSession.current_question_index]?.question_text }}
                   </h3>
 
                   <div 
                     class="w-24 h-24 rounded-2xl flex flex-col items-center justify-center border font-black text-3xl flex-shrink-0"
-                    :class="Math.ceil(presentationTimeLeft) <= 5 ? 'border-red-500 text-red-500 bg-red-950/20 animate-ping' : 'border-white/20 text-slate-100 bg-white/5'"
+                    :class="Math.ceil(presentationTimeLeft) <= 5 ? 'border-red-500 text-red-700 dark:text-red-500 bg-red-500/10 animate-pulse' : 'border-dark-border text-dark-text bg-dark-surface-hover'"
                   >
                     <span>{{ Math.ceil(presentationTimeLeft) }}</span>
                     <span class="text-[8px] uppercase tracking-wide opacity-75 leading-none mt-1">detik</span>
@@ -1100,7 +1128,7 @@ function getOptionSubmitPercentage(option) {
                 </div>
 
                 <!-- Optional Question Image -->
-                <div v-if="questions[activeSession.current_question_index]?.image_path" class="w-full rounded-2xl overflow-hidden bg-slate-950 p-6 border border-white/5 max-h-96 flex items-center justify-center">
+                <div v-if="questions[activeSession.current_question_index]?.image_path" class="w-full rounded-2xl overflow-hidden bg-dark-surface-hover p-6 border border-dark-border max-h-96 flex items-center justify-center">
                   <img 
                     :src="getImageUrl(questions[activeSession.current_question_index]?.image_path)" 
                     alt="Presentation context" 
@@ -1113,14 +1141,14 @@ function getOptionSubmitPercentage(option) {
                   <div 
                     v-for="(o, idx) in questions[activeSession.current_question_index]?.options" 
                     :key="idx"
-                    class="p-6 rounded-2xl border transition-all relative overflow-hidden text-base md:text-xl font-bold"
+                    class="p-6 rounded-2xl border transition-all relative overflow-hidden text-base md:text-xl font-bold flex flex-col justify-between"
                     :class="presentationTimeLeft <= 0 
-                      ? (questions[activeSession.current_question_index]?.question_type !== 'polling' && o === questions[activeSession.current_question_index]?.correct_answer ? 'border-emerald-500 bg-emerald-950/30 text-white' : 'border-white/5 bg-slate-950 text-slate-500')
-                      : 'border-white/10 bg-white/5 text-slate-100'"
+                      ? (questions[activeSession.current_question_index]?.question_type !== 'polling' && o === questions[activeSession.current_question_index]?.correct_answer ? 'border-emerald-500 bg-emerald-950/20 text-emerald-400 shadow-sm' : 'border-dark-border/40 bg-dark-surface/50 text-dark-text-secondary')
+                      : 'border-dark-border bg-dark-surface-hover text-dark-text shadow-sm'"
                   >
-                    <div class="relative z-10 flex justify-between items-center">
+                    <div class="relative z-10 flex justify-between items-center w-full">
                       <div class="flex items-center">
-                        <span class="inline-flex w-8 h-8 bg-white/10 rounded-lg text-sm md:text-base items-center justify-center mr-3 font-extrabold">{{ String.fromCharCode(65 + idx) }}</span>
+                        <span class="inline-flex w-8 h-8 bg-dark-surface border border-dark-border rounded-lg text-sm md:text-base items-center justify-center mr-3 font-extrabold text-dark-text">{{ String.fromCharCode(65 + idx) }}</span>
                         <span>{{ o }}</span>
                       </div>
                       <!-- Percentage count once timer is up -->
@@ -1129,60 +1157,61 @@ function getOptionSubmitPercentage(option) {
                       </div>
                     </div>
 
-                    <!-- Submission Bar Background Chart once timer is up -->
-                    <div 
-                      v-if="presentationTimeLeft <= 0" 
-                      class="absolute left-0 top-0 bottom-0 transition-all duration-500 animate-pulse"
-                      :class="questions[activeSession.current_question_index]?.question_type !== 'polling' && o === questions[activeSession.current_question_index]?.correct_answer ? 'bg-emerald-500/15' : 'bg-white/5'"
-                      :style="{ width: `${getOptionSubmitPercentage(o)}%` }"
-                    ></div>
+                    <!-- Horizontal Bar Chart Progress (Shown when timer is up) -->
+                    <div v-if="presentationTimeLeft <= 0" class="w-full bg-dark-surface border border-dark-border rounded-full h-3 mt-4 overflow-hidden shadow-inner relative z-10">
+                      <div 
+                        class="h-full rounded-full transition-all duration-1000 ease-out" 
+                        :class="questions[activeSession.current_question_index]?.question_type !== 'polling' && o === questions[activeSession.current_question_index]?.correct_answer ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-paragon-medium'"
+                        :style="{ width: `${getOptionSubmitPercentage(o)}%` }"
+                      ></div>
+                    </div>
                   </div>
                 </div>
 
                 <!-- Explanation feedback area after timer -->
                 <div 
                   v-if="presentationTimeLeft <= 0 && questions[activeSession.current_question_index]?.explanation" 
-                  class="p-6 bg-white/5 border border-white/5 rounded-2xl space-y-2 animate-fade-in"
+                  class="p-6 bg-dark-surface-hover border border-dark-border rounded-2xl space-y-2 animate-fade-in text-left"
                 >
                   <h4 class="text-xs font-extrabold uppercase tracking-widest text-paragon-light">Penjelasan Jawaban</h4>
-                  <p class="text-sm md:text-base font-semibold leading-relaxed text-slate-300">
+                  <p class="text-sm md:text-base font-semibold leading-relaxed text-dark-text-secondary">
                     {{ questions[activeSession.current_question_index]?.explanation }}
                   </p>
                 </div>
 
                 <!-- Submission counts status bar -->
-                <div class="flex justify-between items-center text-xs text-slate-400 font-bold border-t border-white/5 pt-4">
+                <div class="flex justify-between items-center text-xs text-dark-text-secondary font-bold border-t border-dark-border pt-4">
                   <span>Pengiriman Jawaban: {{ liveStats?.submissions?.submissions_count || 0 }} / {{ liveStats?.submissions?.total_joined || 0 }}</span>
                   <span v-if="questions[activeSession.current_question_index]?.question_type !== 'polling'">Kunci Jawaban Tampil Saat Waktu Habis</span>
                   <span class="text-accent-cyan" v-else>Polling Selesai Saat Waktu Habis</span>
                 </div>
               </div>
-            </div>
           </div>
         </div>
-
+      </div>
       <!-- 3. FINAL RESULTS / PODIUM -->
       <div 
         v-else-if="activeSession.status === 'finished'" 
-        class="w-full max-w-5xl space-y-8 text-center"
+        class="w-full max-w-5xl space-y-8 text-center animate-fade-in"
       >
         <div class="space-y-3">
           <Trophy class="w-16 h-16 text-amber-500 mx-auto animate-bounce" />
-          <h2 class="text-4xl font-black text-white tracking-tight">Kuis Selesai! Pemenang OTM</h2>
-          <p class="text-slate-400 text-sm max-w-md mx-auto">Tepuk tangan untuk skor tertinggi sharing Parmasys minggu ini!</p>
+          <h2 class="text-4xl font-black text-dark-text tracking-tight">Kuis Selesai! Pemenang OTM</h2>
+          <p class="text-dark-text-secondary text-sm max-w-md mx-auto">Tepuk tangan untuk skor tertinggi sharing Parmasys minggu ini!</p>
         </div>
 
-        <!-- Immersive Leaderboard (Synchronized styling with participant view) -->
+        <!-- Immersive Leaderboard with reveal animation and sound effects enabled -->
         <div class="max-w-3xl mx-auto text-left">
-          <ImmersiveLeaderboard :leaderboard="liveStats?.participants || []" :currentParticipantId="null" :disableAudio="true" />
+          <ImmersiveLeaderboard :leaderboard="liveStats?.participants || []" :currentParticipantId="null" :disableAudio="false" :revealAnimation="true" />
         </div>
       </div>
-        <!-- Floating Admin control bar -->
-        <transition name="fade">
-          <div 
-            v-if="showControls" 
-            class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 backdrop-blur border border-white/10 px-6 py-3.5 rounded-2xl flex items-center gap-4 shadow-2xl transition-all duration-300"
-          >
+
+    <!-- Floating Admin control bar -->
+    <transition name="fade">
+      <div 
+        v-if="showControls" 
+        class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[110] bg-dark-surface/95 backdrop-blur border border-dark-border px-6 py-3.5 rounded-2xl flex items-center gap-4 shadow-2xl transition-all duration-300 text-dark-text"
+      >
             <span class="text-[10px] font-black uppercase text-slate-400 tracking-wider">Kontrol Presentasi:</span>
             
             <button 
@@ -1454,7 +1483,7 @@ function getOptionSubmitPercentage(option) {
           </div>
 
           <!-- Control Actions buttons -->
-          <div class="flex flex-wrap gap-3 border-t border-slate-100 pt-6">
+          <div class="flex flex-wrap gap-3 border-t border-dark-border pt-6">
             <!-- 1. Lobby room start -->
             <button 
               v-if="activeSession.status === 'draft'" 
@@ -1511,25 +1540,80 @@ function getOptionSubmitPercentage(option) {
             </button>
           </div>
 
-          <!-- Submissions monitor -->
-          <div v-if="liveStats?.submissions" class="p-4 bg-amber-50 border border-amber-200/50 rounded-xl space-y-1">
-            <h4 class="text-xs font-bold text-amber-800 uppercase">Pertanyaan Sedang Berlangsung:</h4>
-            <p class="text-xs text-amber-700 font-semibold">{{ liveStats.submissions.question_text }}</p>
+          <!-- Submissions monitor & Bar Chart Stats -->
+          <div v-if="liveStats?.submissions && questions[activeSession.current_question_index]" class="p-5 bg-dark-surface border border-dark-border rounded-2xl space-y-4">
+            <div class="flex justify-between items-center border-b border-dark-border pb-2.5">
+              <h4 class="text-xs font-black text-paragon-light uppercase tracking-wider">Statistik Jawaban Real-Time</h4>
+              <span class="text-[10px] font-extrabold px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                Total Jawab: {{ liveStats.submissions.submissions_count }} / {{ liveStats.submissions.total_joined }}
+              </span>
+            </div>
+            
+            <div class="space-y-1">
+              <span class="text-[10px] font-bold text-dark-text-secondary uppercase">Soal:</span>
+              <p class="text-xs text-dark-text font-semibold leading-relaxed">{{ liveStats.submissions.question_text }}</p>
+            </div>
+
+            <!-- Options Stats (Shown for multiple choice & true/false) -->
+            <div 
+              v-if="questions[activeSession.current_question_index]?.question_type === 'multiple_choice' || questions[activeSession.current_question_index]?.question_type === 'true_false'"
+              class="space-y-3 pt-2"
+            >
+              <div 
+                v-for="(o, idx) in (questions[activeSession.current_question_index]?.question_type === 'true_false' ? ['True', 'False'] : JSON.parse(questions[activeSession.current_question_index]?.options || '[]').filter(opt => opt && opt.trim() !== ''))"
+                :key="idx"
+                class="space-y-1.5"
+              >
+                <div class="flex justify-between items-center text-xs font-bold text-dark-text">
+                  <span class="flex items-center">
+                    <span class="inline-flex w-5 h-5 bg-dark-surface border border-dark-border rounded items-center justify-center mr-2 text-[10px] text-dark-text-secondary font-black">{{ String.fromCharCode(65 + idx) }}</span>
+                    <span>{{ o }}</span>
+                  </span>
+                  <span class="text-dark-text-secondary font-extrabold">{{ getOptionSubmitCount(o) }} orang ({{ getOptionSubmitPercentage(o) }}%)</span>
+                </div>
+                <!-- Mini Progress Bar -->
+                <div class="w-full bg-dark-surface-hover border border-dark-border/60 rounded-full h-2 overflow-hidden">
+                  <div 
+                    class="h-full rounded-full bg-paragon-medium transition-all duration-500"
+                    :style="{ width: `${getOptionSubmitPercentage(o)}%` }"
+                  ></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Short Answer Submissions List -->
+            <div v-else-if="questions[activeSession.current_question_index]?.question_type === 'short_answer'" class="space-y-2 pt-2">
+              <span class="text-[10px] font-bold text-dark-text-secondary uppercase">Penyebaran Jawaban Singkat:</span>
+              <div v-if="!liveStats.submissions.distribution || liveStats.submissions.distribution.length === 0" class="text-xs text-dark-text-secondary italic">
+                Belum ada jawaban masuk.
+              </div>
+              <div v-else class="space-y-2 max-h-40 overflow-y-auto pr-1">
+                <div 
+                  v-for="(dist, idx) in liveStats.submissions.distribution" 
+                  :key="idx"
+                  class="flex justify-between items-center p-2 rounded-xl bg-dark-surface-hover border border-dark-border text-xs text-dark-text"
+                >
+                  <span class="font-semibold">{{ dist.answer }}</span>
+                  <span class="font-extrabold text-paragon-medium">{{ dist.count }} orang</span>
+                </div>
+              </div>
+            </div>
           </div>
 
+
           <!-- Real-Time Leaderboard Score list -->
-          <div class="space-y-3 pt-4 border-t border-slate-100">
-            <h4 class="text-xs font-bold uppercase text-slate-400 tracking-wider">Hasil Live Leaderboard</h4>
-            <div v-if="!liveStats?.participants || liveStats.participants.length === 0" class="text-slate-400 text-xs py-4 font-semibold text-center bg-slate-50 rounded-xl">
+          <div class="space-y-3 pt-4 border-t border-dark-border">
+            <h4 class="text-xs font-bold uppercase text-dark-text-secondary tracking-wider">Hasil Live Leaderboard</h4>
+            <div v-if="!liveStats?.participants || liveStats.participants.length === 0" class="text-dark-text-secondary text-xs py-4 font-semibold text-center bg-dark-surface-hover rounded-xl border border-dark-border">
               Belum ada peserta yang bergabung atau memiliki skor.
             </div>
             <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div 
                 v-for="(p, idx) in liveStats.participants" 
                 :key="p.id" 
-                class="flex justify-between items-center p-3 border border-slate-100 bg-slate-50 hover:bg-slate-100/30 rounded-xl text-xs transition-all"
+                class="flex justify-between items-center p-3 border border-dark-border bg-dark-surface-hover hover:bg-dark-surface rounded-xl text-xs transition-all text-dark-text"
               >
-                <span class="font-bold text-slate-700"><span class="text-slate-400 mr-1.5">#{{ idx + 1 }}</span>{{ p.name }}</span>
+                <span class="font-bold"><span class="text-dark-text-secondary mr-1.5">#{{ idx + 1 }}</span>{{ p.name }}</span>
                 <span class="font-extrabold text-paragon-medium">{{ p.current_score }} Pts</span>
               </div>
             </div>

@@ -322,6 +322,97 @@ class SoundEffects {
     }
   }
 
+  // Play chimes/fanfare for individual podium spot reveals (3rd & 2nd)
+  podiumReveal(rank) {
+    this.resumeContext()
+    if (!this.audioContext) return
+    const ctx = this.audioContext
+    const now = ctx.currentTime
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.type = 'triangle'
+
+    // 3rd place gets slightly lower pitch than 2nd place
+    const baseFreq = rank === 3 ? 349.23 : 440.00 // F4 or A4
+    osc.frequency.setValueAtTime(baseFreq, now)
+    osc.frequency.exponentialRampToValueAtTime(baseFreq * 2, now + 0.4)
+
+    gain.gain.setValueAtTime(this.masterVolume * 0.25, now)
+    gain.gain.exponentialRampToValueAtTime(0.005, now + 0.4)
+
+    osc.start(now)
+    osc.stop(now + 0.4)
+  }
+
+  // Play epic grand victory arpeggio and detuned brass chorus chord
+  epicVictory() {
+    this.resumeContext()
+    if (!this.audioContext) return
+    const ctx = this.audioContext
+    const now = ctx.currentTime
+
+    // 1. Rapid rising synthesized arpeggio chimes (C major scale)
+    const arpeggio = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50, 1318.51]
+    arpeggio.forEach((freq, idx) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(freq, now + idx * 0.08)
+      gain.gain.setValueAtTime(this.masterVolume * 0.16, now + idx * 0.08)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.3)
+      osc.start(now + idx * 0.08)
+      osc.stop(now + idx * 0.08 + 0.3)
+    })
+
+    // 2. Grand Sustained Triumphant Fanfare (brassy detuned sawtooth chord chorus)
+    const chordTime = now + arpeggio.length * 0.08
+    const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50] // C4, E4, G4, C5, E5, G5, C6
+    notes.forEach((freq) => {
+      const duration = 4.0 // long sustain
+
+      const osc1 = ctx.createOscillator()
+      const osc2 = ctx.createOscillator()
+      const gain = ctx.createGain()
+
+      osc1.connect(gain)
+      osc2.connect(gain)
+      gain.connect(ctx.destination)
+
+      osc1.type = 'sawtooth'
+      osc2.type = 'triangle'
+
+      // Detune slightly to produce chorus effect
+      osc1.frequency.setValueAtTime(freq - 1.5, chordTime)
+      osc2.frequency.setValueAtTime(freq + 1.5, chordTime)
+
+      // Add a nice low-frequency vibrato for extra epic punch
+      const lfo = ctx.createOscillator()
+      const lfoGain = ctx.createGain()
+      lfo.frequency.value = 6.5 // 6.5 Hz modulation
+      lfoGain.gain.value = 4.0   // 4Hz vibrato range
+      lfo.connect(lfoGain)
+      lfoGain.connect(osc1.frequency)
+      lfoGain.connect(osc2.frequency)
+      lfo.start(chordTime)
+      lfo.stop(chordTime + duration)
+
+      // Fade-in quick, sustain, then decay
+      gain.gain.setValueAtTime(0.001, chordTime)
+      gain.gain.linearRampToValueAtTime(this.masterVolume * 0.1, chordTime + 0.15)
+      gain.gain.setValueAtTime(this.masterVolume * 0.1, chordTime + duration - 1.2)
+      gain.gain.exponentialRampToValueAtTime(0.001, chordTime + duration)
+
+      osc1.start(chordTime)
+      osc2.start(chordTime)
+      osc1.stop(chordTime + duration)
+      osc2.stop(chordTime + duration)
+    })
+  }
+
   setVolume(volume) {
     this.masterVolume = Math.max(0, Math.min(1, volume))
   }
