@@ -15,6 +15,13 @@
   
   --ice: #EEF4F8;
   --paragon-light: #8DA9C4;
+  
+  --active-card-bg: linear-gradient(135deg, #134074 0%, #0B2545 100%);
+  --active-card-border: rgba(141, 169, 196, 0.2);
+  --active-card-title: #EEF4F8;
+  --active-card-text: rgba(238, 244, 248, 0.8);
+  --active-card-btn-bg: linear-gradient(to right, #EEF4F8 0%, #8DA9C4 100%);
+  --active-card-btn-text: #0B2545;
 }
 
 :root.day-mode {
@@ -32,6 +39,13 @@
   
   --ice: #0B2545;
   --paragon-light: #134074;
+  
+  --active-card-bg: linear-gradient(135deg, #E0F2FE 0%, #BAE6FD 100%);
+  --active-card-border: #90CDF4;
+  --active-card-title: #0C4A6E;
+  --active-card-text: #0369A1;
+  --active-card-btn-bg: linear-gradient(to right, #0284C7 0%, #0369A1 100%);
+  --active-card-btn-text: #FFFFFF;
 }
 
 @theme {
@@ -48,6 +62,14 @@
   --color-dark-border: var(--border);
   --color-dark-text: var(--text);
   --color-dark-text-secondary: var(--text-secondary);
+  
+  /* Active session card variables */
+  --color-active-card-bg: var(--active-card-bg);
+  --color-active-card-border: var(--active-card-border);
+  --color-active-card-title: var(--active-card-title);
+  --color-active-card-text: var(--active-card-text);
+  --color-active-card-btn-bg: var(--active-card-btn-bg);
+  --color-active-card-btn-text: var(--active-card-btn-text);
   
   /* Accent colors for variety */
   --color-accent-cyan: #06B6D4;

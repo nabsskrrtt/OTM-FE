@@ -389,33 +389,33 @@ onUnmounted(() => {
       </div>
 
       <!-- Live Session Status Banner -->
-      <div v-if="activeSession" class="bg-gradient-to-br from-paragon-medium via-paragon-dark to-paragon-dark text-white rounded-3xl shadow-2xl p-8 relative overflow-hidden border border-paragon-light/20">
+      <div v-if="activeSession" class="bg-active-card-bg rounded-3xl shadow-2xl p-8 relative overflow-hidden border border-active-card-border">
         <div class="relative z-10 space-y-5">
-          <div class="flex items-center space-x-2 bg-emerald-500/20 backdrop-blur px-4 py-1.5 rounded-full w-max text-[10px] font-extrabold tracking-widest uppercase">
-            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <div class="flex items-center space-x-2 text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 dark:bg-emerald-500/20 px-4 py-1.5 rounded-full w-max text-[10px] font-extrabold tracking-widest uppercase">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse"></span>
             <span>🔴 LIVE - Kuis Dimulai Sekarang!</span>
           </div>
 
           <div class="space-y-2">
-            <h3 class="text-2xl font-black tracking-tight">🎯 {{ activeSession.reference || 'Tema Sharing' }}</h3>
-            <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-paragon-ice/80 font-medium">
+            <h3 class="text-2xl font-black tracking-tight text-active-card-title">🎯 {{ activeSession.reference || 'Tema Sharing' }}</h3>
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-active-card-text font-medium">
               <div class="flex items-center space-x-2">
                 <span>👥 PIC:</span>
-                <strong class="text-paragon-ice">{{ activeSession.pic_karyawan }} &amp; {{ activeSession.pic_intern }}</strong>
+                <strong class="text-active-card-title">{{ activeSession.pic_karyawan }} &amp; {{ activeSession.pic_intern }}</strong>
               </div>
-              <span class="hidden md:inline text-paragon-light/40">•</span>
+              <span class="hidden md:inline text-active-card-text/40">•</span>
               <div class="flex items-center space-x-2">
                 <span>📅</span>
-                <strong class="text-paragon-ice">{{ activeSession.date }}</strong>
+                <strong class="text-active-card-title">{{ activeSession.date }}</strong>
               </div>
             </div>
           </div>
 
           <button 
             @click="joinQuiz" 
-            class="btn-join-quiz px-8 py-4 bg-gradient-to-r from-paragon-ice to-paragon-light text-paragon-dark font-black rounded-2xl hover:shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center space-x-2 shadow-lg text-base"
+            class="btn-join-quiz px-8 py-4 bg-gradient-to-r from-active-card-btn-bg to-active-card-btn-bg bg-active-card-btn-bg text-active-card-btn-text font-black rounded-2xl hover:shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center space-x-2 shadow-lg text-base"
           >
-            <Play class="icon-join-quiz w-5 h-5 fill-paragon-dark" />
+            <Play class="icon-join-quiz w-5 h-5 fill-current" />
             <span>🚀 Gabung Sesi Live</span>
           </button>
         </div>
