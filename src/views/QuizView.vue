@@ -546,20 +546,20 @@ onUnmounted(() => {
                 :key="idx"
                 @click="submitAnswer(opt)"
                 :disabled="loading"
-                class="w-full text-left p-5 rounded-2xl border-2 text-sm font-extrabold active:scale-[0.98] transition-all duration-200 disabled:opacity-50"
+                class="btn-option-mc w-full text-left p-5 rounded-2xl border-2 text-sm font-extrabold active:scale-[0.98] transition-all duration-200 disabled:opacity-50"
                 :class="[
-                  idx === 0 ? 'border-red-500 text-white bg-red-500/10 hover:bg-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.35)]' : '',
-                  idx === 1 ? 'border-sky-500 text-white bg-sky-500/10 hover:bg-sky-500/20 shadow-[0_0_20px_rgba(14,165,233,0.35)]' : '',
-                  idx === 2 ? 'border-amber-400 text-white bg-amber-400/10 hover:bg-amber-400/20 shadow-[0_0_20px_rgba(251,191,36,0.35)]' : '',
-                  idx === 3 ? 'border-emerald-400 text-white bg-emerald-400/10 hover:bg-emerald-400/20 shadow-[0_0_20px_rgba(52,211,153,0.35)]' : ''
+                  idx === 0 ? 'border-red-500 text-dark-text bg-red-500/10 hover:bg-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.35)]' : '',
+                  idx === 1 ? 'border-sky-500 text-dark-text bg-sky-500/10 hover:bg-sky-500/20 shadow-[0_0_20px_rgba(14,165,233,0.35)]' : '',
+                  idx === 2 ? 'border-amber-400 text-dark-text bg-amber-400/10 hover:bg-amber-400/20 shadow-[0_0_20px_rgba(251,191,36,0.35)]' : '',
+                  idx === 3 ? 'border-emerald-400 text-dark-text bg-emerald-400/10 hover:bg-emerald-400/20 shadow-[0_0_20px_rgba(52,211,153,0.35)]' : ''
                 ]"
               >
-                <span class="inline-flex w-6 h-6 items-center justify-center rounded-lg text-white mr-3 text-xs uppercase"
+                <span class="inline-flex w-6 h-6 items-center justify-center rounded-lg text-white mr-3 text-xs uppercase font-extrabold"
                   :class="[
-                    idx === 0 ? 'bg-red-500/25 text-white border border-red-500/40' : '',
-                    idx === 1 ? 'bg-sky-500/25 text-white border border-sky-500/40' : '',
-                    idx === 2 ? 'bg-amber-500/25 text-white border border-amber-500/40' : '',
-                    idx === 3 ? 'bg-emerald-500/25 text-white border border-emerald-500/40' : ''
+                    idx === 0 ? 'bg-red-500' : '',
+                    idx === 1 ? 'bg-sky-500' : '',
+                    idx === 2 ? 'bg-amber-500' : '',
+                    idx === 3 ? 'bg-emerald-500' : ''
                   ]"
                 >
                   {{ String.fromCharCode(65 + idx) }}
@@ -573,14 +573,14 @@ onUnmounted(() => {
               <button 
                 @click="submitAnswer('True')" 
                 :disabled="loading"
-                class="py-5 border-2 rounded-2xl font-black text-lg active:scale-95 transition-all text-center border-emerald-400 text-white bg-emerald-400/10 hover:bg-emerald-400/20 shadow-[0_0_20px_rgba(52,211,153,0.35)]"
+                class="btn-option-mc py-5 border-2 rounded-2xl font-black text-lg active:scale-95 transition-all text-center border-emerald-400 text-dark-text bg-emerald-400/10 hover:bg-emerald-400/20 shadow-[0_0_20px_rgba(52,211,153,0.35)]"
               >
                 BENAR (True)
               </button>
               <button 
                 @click="submitAnswer('False')" 
                 :disabled="loading"
-                class="py-5 border-2 rounded-2xl font-black text-lg active:scale-95 transition-all text-center border-red-500 text-white bg-red-500/10 hover:bg-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.35)]"
+                class="btn-option-mc py-5 border-2 rounded-2xl font-black text-lg active:scale-95 transition-all text-center border-red-500 text-dark-text bg-red-500/10 hover:bg-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.35)]"
               >
                 SALAH (False)
               </button>
@@ -612,12 +612,12 @@ onUnmounted(() => {
                 :key="idx"
                 @click="submitAnswer(opt)"
                 :disabled="loading"
-                class="w-full text-left p-5 rounded-2xl border-2 text-sm font-extrabold active:scale-[0.98] transition-all duration-200 disabled:opacity-50"
+                class="btn-option-mc w-full text-left p-5 rounded-2xl border-2 text-sm font-extrabold active:scale-[0.98] transition-all duration-200 disabled:opacity-50"
                 :class="[
-                  idx === 0 ? 'border-red-500 text-white bg-red-500/10 hover:bg-red-500/20' : '',
-                  idx === 1 ? 'border-sky-500 text-white bg-sky-500/10 hover:bg-sky-500/20' : '',
-                  idx === 2 ? 'border-amber-400 text-white bg-amber-400/10 hover:bg-amber-400/20' : '',
-                  idx === 3 ? 'border-emerald-400 text-white bg-emerald-400/10 hover:bg-emerald-400/20' : ''
+                  idx === 0 ? 'border-red-500 text-dark-text bg-red-500/10 hover:bg-red-500/20' : '',
+                  idx === 1 ? 'border-sky-500 text-dark-text bg-sky-500/10 hover:bg-sky-500/20' : '',
+                  idx === 2 ? 'border-amber-400 text-dark-text bg-amber-400/10 hover:bg-amber-400/20' : '',
+                  idx === 3 ? 'border-emerald-400 text-dark-text bg-emerald-400/10 hover:bg-emerald-400/20' : ''
                 ]"
               >
                 <span>{{ opt }}</span>

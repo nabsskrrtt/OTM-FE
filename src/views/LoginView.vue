@@ -391,9 +391,9 @@ onUnmounted(() => {
 
           <button 
             @click="joinQuiz" 
-            class="px-8 py-4 bg-gradient-to-r from-paragon-ice to-paragon-light text-paragon-dark font-black rounded-2xl hover:shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center space-x-2 shadow-lg text-base"
+            class="btn-join-quiz px-8 py-4 bg-gradient-to-r from-paragon-ice to-paragon-light text-paragon-dark font-black rounded-2xl hover:shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center space-x-2 shadow-lg text-base"
           >
-            <Play class="w-5 h-5 fill-paragon-dark" />
+            <Play class="icon-join-quiz w-5 h-5 fill-paragon-dark" />
             <span>🚀 Gabung Sesi Live</span>
           </button>
         </div>
@@ -451,31 +451,31 @@ onUnmounted(() => {
       </div>
 
       <!-- Leaderboard Umum Card with Tabs -->
-      <div class="bg-dark-surface rounded-3xl border border-dark-border shadow-xl p-8 space-y-6">
+      <div class="bg-dark-surface rounded-3xl border border-dark-border shadow-xl p-4 sm:p-8 space-y-6">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-dark-border pb-4 gap-4">
           <div class="flex items-center space-x-3">
             <h3 class="font-black text-lg text-paragon-ice">🏆 Peringkat Umum</h3>
           </div>
           
           <!-- Tab Buttons -->
-          <div class="flex bg-dark-surface-hover p-1 rounded-xl border border-dark-border">
+          <div class="flex w-full sm:w-auto bg-dark-surface-hover p-1 rounded-xl border border-dark-border max-w-full overflow-x-auto">
             <button 
               @click="activeLeaderboardTab = 'weekly'"
-              class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all"
+              class="flex-1 sm:flex-initial px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap text-center"
               :class="activeLeaderboardTab === 'weekly' ? 'bg-gradient-to-r from-paragon-medium to-paragon-dark text-white shadow' : 'text-dark-text-secondary hover:text-white'"
             >
               Mingguan
             </button>
             <button 
               @click="activeLeaderboardTab = 'monthly'"
-              class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all"
+              class="flex-1 sm:flex-initial px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap text-center"
               :class="activeLeaderboardTab === 'monthly' ? 'bg-gradient-to-r from-paragon-medium to-paragon-dark text-white shadow' : 'text-dark-text-secondary hover:text-white'"
             >
               Bulanan
             </button>
             <button 
               @click="activeLeaderboardTab = 'lifetime'"
-              class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all"
+              class="flex-1 sm:flex-initial px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap text-center"
               :class="activeLeaderboardTab === 'lifetime' ? 'bg-gradient-to-r from-paragon-medium to-paragon-dark text-white shadow' : 'text-dark-text-secondary hover:text-white'"
             >
               Lifetime
@@ -515,51 +515,57 @@ onUnmounted(() => {
         <!-- Monthly Leaderboard Table (Weekly Breakdown W1-W5) -->
         <div v-else-if="activeLeaderboardTab === 'monthly'" class="space-y-4">
           <!-- Date picker row -->
-          <div class="flex items-center space-x-3 px-4">
-            <label class="text-[10px] font-black text-paragon-light uppercase tracking-widest">Bulan Laporan:</label>
+          <div class="flex flex-col sm:flex-row sm:items-center gap-2 px-4">
+            <label class="text-[10px] font-black text-paragon-light uppercase tracking-widest flex-shrink-0">Bulan Laporan:</label>
             <input 
               v-model="selectedMonthLeaderboard" 
               type="month" 
               @change="fetchWeeklyLeaderboard"
-              class="bg-dark-surface border border-dark-border text-dark-text text-[11px] font-bold rounded-lg px-2 py-1 outline-none focus:border-paragon-medium"
+              class="bg-dark-surface border border-dark-border text-dark-text text-[11px] font-bold rounded-lg px-2 py-1 outline-none focus:border-paragon-medium w-full sm:w-auto"
             />
           </div>
-          <div class="flex items-center justify-between text-[10px] font-black text-paragon-light/60 uppercase tracking-widest px-4">
-            <span>Peserta</span>
-            <div class="flex space-x-3">
-              <span class="w-9 text-center">W1</span>
-              <span class="w-9 text-center">W2</span>
-              <span class="w-9 text-center">W3</span>
-              <span class="w-9 text-center">W4</span>
-              <span class="w-9 text-center">W5</span>
-              <span class="w-12 text-right">Total</span>
-            </div>
-          </div>
-          <div class="space-y-2 max-h-80 overflow-y-auto pr-2">
-            <div v-if="weeklyLeaderboard.length === 0" class="text-dark-text-secondary text-xs text-center py-6">
-              Tidak ada data untuk bulan ini.
-            </div>
-            <div 
-              v-else
-              v-for="(p, idx) in weeklyLeaderboard" 
-              :key="p.participant_id"
-              class="flex justify-between items-center px-4 py-3.5 rounded-2xl border text-xs font-bold transition-all"
-              :class="p.participant_id == currentParticipant?.id 
-                ? 'border-accent-cyan bg-gradient-to-r from-cyan-950/30 via-dark-surface to-cyan-950/30 text-white font-extrabold shadow-[0_0_12px_rgba(6,182,212,0.2)]' 
-                : 'border-dark-border bg-dark-surface-hover hover:border-paragon-light/20'"
-            >
-              <div class="flex items-center space-x-3 flex-1 min-w-0">
-                <span class="w-5 text-slate-500 font-extrabold text-[10px]">#{{ idx + 1 }}</span>
-                <span class="truncate text-dark-text leading-tight">{{ p.name }}</span>
-                <span v-if="p.participant_id == currentParticipant?.id" class="text-[8px] bg-gradient-to-r from-accent-cyan to-paragon-medium text-white px-2 py-0.5 rounded-full font-bold ml-2 flex-shrink-0">⭐ Anda</span>
+
+          <!-- Wrapper for horizontal scrolling on mobile -->
+          <div class="overflow-x-auto pb-2 -mx-4 px-4 scrollbar-thin">
+            <div class="min-w-[460px] space-y-3">
+              <div class="flex items-center justify-between text-[10px] font-black text-paragon-light/60 uppercase tracking-widest px-4">
+                <span>Peserta</span>
+                <div class="flex space-x-3">
+                  <span class="w-9 text-center">W1</span>
+                  <span class="w-9 text-center">W2</span>
+                  <span class="w-9 text-center">W3</span>
+                  <span class="w-9 text-center">W4</span>
+                  <span class="w-9 text-center">W5</span>
+                  <span class="w-12 text-right">Total</span>
+                </div>
               </div>
-              <div class="flex space-x-3 text-[10px] font-bold text-slate-400">
-                <span class="w-9 text-center">{{ p.weeks[0] || '-' }}</span>
-                <span class="w-9 text-center">{{ p.weeks[1] || '-' }}</span>
-                <span class="w-9 text-center">{{ p.weeks[2] || '-' }}</span>
-                <span class="w-9 text-center">{{ p.weeks[3] || '-' }}</span>
-                <span class="w-9 text-center">{{ p.weeks[4] || '-' }}</span>
-                <span class="w-12 text-right text-xs font-black text-paragon-light">{{ p.total }}</span>
+              <div class="space-y-2 max-h-80 overflow-y-auto pr-2">
+                <div v-if="weeklyLeaderboard.length === 0" class="text-dark-text-secondary text-xs text-center py-6">
+                  Tidak ada data untuk bulan ini.
+                </div>
+                <div 
+                  v-else
+                  v-for="(p, idx) in weeklyLeaderboard" 
+                  :key="p.participant_id"
+                  class="flex justify-between items-center px-4 py-3.5 rounded-2xl border text-xs font-bold transition-all"
+                  :class="p.participant_id == currentParticipant?.id 
+                    ? 'border-accent-cyan bg-gradient-to-r from-cyan-950/30 via-dark-surface to-cyan-950/30 text-white font-extrabold shadow-[0_0_12px_rgba(6,182,212,0.2)]' 
+                    : 'border-dark-border bg-dark-surface-hover hover:border-paragon-light/20'"
+                >
+                  <div class="flex items-center space-x-3 flex-1 min-w-0 pr-4">
+                    <span class="w-5 text-slate-500 font-extrabold text-[10px]">#{{ idx + 1 }}</span>
+                    <span class="truncate text-dark-text leading-tight">{{ p.name }}</span>
+                    <span v-if="p.participant_id == currentParticipant?.id" class="text-[8px] bg-gradient-to-r from-accent-cyan to-paragon-medium text-white px-2 py-0.5 rounded-full font-bold ml-2 flex-shrink-0">⭐ Anda</span>
+                  </div>
+                  <div class="flex space-x-3 text-[10px] font-bold text-slate-400 flex-shrink-0">
+                    <span class="w-9 text-center">{{ p.weeks[0] || '-' }}</span>
+                    <span class="w-9 text-center">{{ p.weeks[1] || '-' }}</span>
+                    <span class="w-9 text-center">{{ p.weeks[2] || '-' }}</span>
+                    <span class="w-9 text-center">{{ p.weeks[3] || '-' }}</span>
+                    <span class="w-9 text-center">{{ p.weeks[4] || '-' }}</span>
+                    <span class="w-12 text-right text-xs font-black text-paragon-light">{{ p.total }}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
