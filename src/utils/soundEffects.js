@@ -18,6 +18,10 @@ class SoundEffects {
     }
   }
 
+  async initialize() {
+    await this.resumeContext()
+  }
+
   // Play a simple synthesized beep
   generateBeep(frequency = 800, duration = 100) {
     this.resumeContext()

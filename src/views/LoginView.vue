@@ -133,9 +133,8 @@ async function fetchParticipants() {
 // Check active session status
 async function checkActiveSession() {
   try {
-    const url = currentParticipant.value 
-      ? `${API_BASE}/sessions/active?participant_id=${currentParticipant.value.id}`
-      : `${API_BASE}/sessions/active`
+    // Only fetch active session state without registering attendance automatically on login portal background polling
+    const url = `${API_BASE}/sessions/active`
     const res = await fetch(url)
     if (res.ok) {
       const data = await res.json()
@@ -413,7 +412,8 @@ onUnmounted(() => {
 
           <button 
             @click="joinQuiz" 
-            class="btn-join-quiz px-8 py-4 bg-gradient-to-r from-active-card-btn-bg to-active-card-btn-bg bg-active-card-btn-bg text-active-card-btn-text font-black rounded-2xl hover:shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center space-x-2 shadow-lg text-base"
+            class="btn-join-quiz px-8 py-4 text-active-card-btn-text font-black rounded-2xl hover:shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center space-x-2 shadow-lg text-base"
+            style="background: var(--active-card-btn-bg);"
           >
             <Play class="icon-join-quiz w-5 h-5 fill-current" />
             <span>🚀 Gabung Sesi Live</span>

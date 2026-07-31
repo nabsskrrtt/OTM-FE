@@ -379,7 +379,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="max-w-xl mx-auto space-y-6">
+  <div>
+    <div class="max-w-xl mx-auto space-y-6">
     <!-- Inline Fallback Login Selector -->
     <div 
       v-if="showLogin" 
@@ -761,5 +762,6 @@ onUnmounted(() => {
     >
       {{ emo }}
     </button>
+  </div>
   </div>
 </template>
