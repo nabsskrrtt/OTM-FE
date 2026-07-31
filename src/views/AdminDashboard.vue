@@ -117,12 +117,29 @@ function getImageUrl(path) {
   return `${host}${relative}`
 }
 
+function getQuestionOptions(q) {
+  if (!q) return []
+  let opts = []
+  if (Array.isArray(q.options)) {
+    opts = q.options
+  } else if (typeof q.options === 'string') {
+    try {
+      const parsed = JSON.parse(q.options)
+      if (Array.isArray(parsed)) opts = parsed
+    } catch (e) {
+      opts = q.options.split(',')
+    }
+  }
+  return opts.map(o => o?.toString().trim()).filter(o => o && o !== '')
+}
+
 let prevQuestionIndex = null
 let prevShowLeaderboard = null
 let prevSessionStatus = null
 let ambientAudioInstance = null
 
 function syncPresentationAudioState(session) {
+  if (!showPresentationMode.value) return
   if (!session) return
   const currentIdx = session.current_question_index
   const currentShowLeaderboard = session.show_leaderboard === 1 || session.show_leaderboard === true
@@ -376,8 +393,8 @@ async function fetchLiveStats() {
         }
       }
 
-      // Sync presentation timer when question index changes
-      if (liveStats.value.session_status === 'active' && liveStats.value.submissions && !activeSession.value?.show_leaderboard) {
+      // Sync presentation timer when question index changes (only in presentation mode)
+      if (showPresentationMode.value && liveStats.value.session_status === 'active' && liveStats.value.submissions && !activeSession.value?.show_leaderboard) {
         const qId = liveStats.value.submissions.question_id
         if (currentQuestionIdForTimer !== qId) {
           currentQuestionIdForTimer = qId
@@ -1139,7 +1156,7 @@ function getOptionSubmitPercentage(option) {
                 <!-- Choices Options -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div 
-                    v-for="(o, idx) in questions[activeSession.current_question_index]?.options" 
+                    v-for="(o, idx) in getQuestionOptions(questions[activeSession.current_question_index])" 
                     :key="idx"
                     class="p-6 rounded-2xl border transition-all relative overflow-hidden text-base md:text-xl font-bold flex flex-col justify-between"
                     :class="presentationTimeLeft <= 0 
@@ -1560,7 +1577,7 @@ function getOptionSubmitPercentage(option) {
               class="space-y-3 pt-2"
             >
               <div 
-                v-for="(o, idx) in (questions[activeSession.current_question_index]?.question_type === 'true_false' ? ['True', 'False'] : JSON.parse(questions[activeSession.current_question_index]?.options || '[]').filter(opt => opt && opt.trim() !== ''))"
+                v-for="(o, idx) in (questions[activeSession.current_question_index]?.question_type === 'true_false' ? ['True', 'False'] : getQuestionOptions(questions[activeSession.current_question_index]))"
                 :key="idx"
                 class="space-y-1.5"
               >
