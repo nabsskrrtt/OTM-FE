@@ -555,7 +555,7 @@ async function createSession() {
   errorMsg.value = ''
   successMsg.value = ''
   if (!sessionForm.value.pic_karyawan || !sessionForm.value.pic_intern) {
-    errorMsg.value = "Silakan pilih PIC Karyawan Tetap dan PIC Intern."
+    errorMsg.value = "Silakan pilih PIC Sharing Session dan PIC Reader."
     return
   }
   try {
@@ -1360,23 +1360,23 @@ function getOptionSubmitPercentage(option) {
             
             <!-- PIC Dropdowns -->
             <div>
-              <label class="block text-xs font-bold text-paragon-light mb-1.5">PIC Karyawan Tetap</label>
+              <label class="block text-xs font-bold text-paragon-light mb-1.5">PIC Sharing Session</label>
               <select 
                 v-model="sessionForm.pic_karyawan" 
                 class="w-full bg-dark-surface-hover border border-dark-border text-dark-text text-xs font-semibold rounded-xl px-3 py-2.5 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 cursor-pointer"
               >
-                <option value="" disabled>-- Pilih PIC Karyawan --</option>
+                <option value="" disabled>-- Pilih PIC Sharing Session --</option>
                 <option v-for="p in picKaryawanChoices" :key="p.id" :value="p.name">{{ p.name }}</option>
               </select>
             </div>
             
             <div>
-              <label class="block text-xs font-bold text-paragon-light mb-1.5">PIC Intern</label>
+              <label class="block text-xs font-bold text-paragon-light mb-1.5">PIC Reader</label>
               <select 
                 v-model="sessionForm.pic_intern" 
                 class="w-full bg-dark-surface-hover border border-dark-border text-dark-text text-xs font-semibold rounded-xl px-3 py-2.5 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 cursor-pointer"
               >
-                <option value="" disabled>-- Pilih PIC Intern --</option>
+                <option value="" disabled>-- Pilih PIC Reader --</option>
                 <option v-for="p in picInternChoices" :key="p.id" :value="p.name">{{ p.name }}</option>
               </select>
             </div>
@@ -1460,7 +1460,7 @@ function getOptionSubmitPercentage(option) {
           <!-- Session details card with Presentation Buttons moved inside -->
           <div class="p-5 rounded-2xl bg-dark-surface border border-dark-border flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs flex-1">
-              <div><span class="text-dark-text-secondary block mb-0.5">PIC Tetap &amp; Intern</span><strong class="text-dark-text">{{ activeSession.pic_karyawan }} &amp; {{ activeSession.pic_intern }}</strong></div>
+              <div><span class="text-dark-text-secondary block mb-0.5">PIC Sharing &amp; Reader</span><strong class="text-dark-text">{{ activeSession.pic_karyawan }} &amp; {{ activeSession.pic_intern }}</strong></div>
               <div><span class="text-dark-text-secondary block mb-0.5">Parmasys Reference</span><strong class="truncate block max-w-[150px] text-dark-text">{{ activeSession.reference }}</strong></div>
               <div><span class="text-dark-text-secondary block mb-0.5">Status Sesi</span><strong class="uppercase text-paragon-light block">{{ activeSession.status }}</strong></div>
             </div>
