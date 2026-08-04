@@ -203,6 +203,24 @@ watch(showPresentationMode, (newVal) => {
   }
 })
 
+watch(
+  () => activeSession.value,
+  (newSession) => {
+    if (newSession && newSession.status === 'active' && newSession.current_question_index >= 0 && !newSession.show_leaderboard) {
+      // If we transition to a question, make sure presentationTimeLeft is reset immediately
+      // to prevent showing the correct answer of the new question before the countdown starts.
+      if (presentationTimeLeft.value <= 0) {
+        const currentQ = questions.value[newSession.current_question_index]
+        const limit = currentQ ? currentQ.time_limit : 20
+        presentationTimeLeft.value = limit
+        presentationTimeLimit.value = limit
+        currentQuestionIdForTimer = null
+      }
+    }
+  },
+  { deep: true }
+)
+
 // Form states
 const sessionForm = ref({ date: new Date().toISOString().split('T')[0], pic_karyawan: '', pic_intern: '', reference: '' })
 const showEditSessionModal = ref(false)
