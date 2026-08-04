@@ -205,6 +205,8 @@ watch(showPresentationMode, (newVal) => {
 
 // Form states
 const sessionForm = ref({ date: new Date().toISOString().split('T')[0], pic_karyawan: '', pic_intern: '', reference: '' })
+const showEditSessionModal = ref(false)
+const editSessionForm = ref({ date: '', pic_karyawan: '', pic_intern: '', reference: '' })
 const participantForm = ref({ name: '' })
 const editingParticipant = ref(null)
 
@@ -578,6 +580,49 @@ async function createSession() {
   }
 }
 
+function startEditSession() {
+  if (!activeSession.value) return
+  editSessionForm.value = {
+    date: activeSession.value.date,
+    pic_karyawan: activeSession.value.pic_karyawan,
+    pic_intern: activeSession.value.pic_intern,
+    reference: activeSession.value.reference
+  }
+  showEditSessionModal.value = true
+}
+
+async function saveEditSession() {
+  if (!activeSession.value) return
+  errorMsg.value = ''
+  successMsg.value = ''
+
+  if (!editSessionForm.value.pic_karyawan || !editSessionForm.value.pic_intern) {
+    alert("Silakan pilih PIC Sharing Session dan PIC Reader.")
+    return
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/admin/sessions/${activeSession.value.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(editSessionForm.value)
+    })
+    const data = await res.json()
+    if (res.ok) {
+      soundEffects.submit()
+      successMsg.value = `Sesi "${data.reference}" berhasil diperbarui.`
+      activeSession.value = data
+      showEditSessionModal.value = false
+      fetchSessions()
+    } else {
+      alert(data.error || "Gagal memperbarui sesi.")
+    }
+  } catch (err) {
+    console.error("Gagal edit sesi:", err)
+    alert("Koneksi backend gagal.")
+  }
+}
+
 async function updateSessionStatus(status, qIndex = null, showLeaderboard = null) {
   if (!activeSession.value) return
   const body = {}
@@ -604,6 +649,7 @@ async function updateSessionStatus(status, qIndex = null, showLeaderboard = null
 async function selectActiveSession(session) {
   errorMsg.value = ''
   successMsg.value = ''
+  showEditSessionModal.value = false
   activeSession.value = session
   selectedSessionIdForQuestions.value = session.id
   fetchQuestions(session.id)
@@ -1458,15 +1504,23 @@ function getOptionSubmitPercentage(option) {
         <!-- Active session workspace -->
         <div v-else class="space-y-6">
           <!-- Session details card with Presentation Buttons moved inside -->
-          <div class="p-5 rounded-2xl bg-dark-surface border border-dark-border flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs flex-1">
+          <div class="p-5 rounded-2xl bg-dark-surface border border-dark-border flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs flex-1">
               <div><span class="text-dark-text-secondary block mb-0.5">PIC Sharing &amp; Reader</span><strong class="text-dark-text">{{ activeSession.pic_karyawan }} &amp; {{ activeSession.pic_intern }}</strong></div>
               <div><span class="text-dark-text-secondary block mb-0.5">Parmasys Reference</span><strong class="truncate block max-w-[150px] text-dark-text">{{ activeSession.reference }}</strong></div>
+              <div><span class="text-dark-text-secondary block mb-0.5">Tanggal Sesi</span><strong class="text-dark-text">{{ activeSession.date }}</strong></div>
               <div><span class="text-dark-text-secondary block mb-0.5">Status Sesi</span><strong class="uppercase text-paragon-light block">{{ activeSession.status }}</strong></div>
             </div>
 
-            <!-- Presentation Trigger Buttons (Grouped on Session Card) -->
+            <!-- Presentation & Edit Buttons -->
             <div class="flex items-center space-x-2 flex-shrink-0">
+              <button 
+                @click="startEditSession"
+                class="px-3 py-2.5 bg-dark-surface hover:bg-dark-surface-hover text-dark-text border border-dark-border rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5"
+              >
+                <Edit2 class="w-3.5 h-3.5 text-paragon-light" />
+                <span>Edit Sesi</span>
+              </button>
               <button 
                 @click="showPresentationMode = true"
                 class="px-3.5 py-2.5 bg-paragon-medium hover:bg-paragon-dark text-white rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 shadow-sm"
@@ -1474,7 +1528,6 @@ function getOptionSubmitPercentage(option) {
                 <Tv class="w-3.5 h-3.5" />
                 <span>Layar Presentasi</span>
               </button>
-
             </div>
           </div>
 
@@ -2055,6 +2108,85 @@ function getOptionSubmitPercentage(option) {
             </div>
             <span class="text-xs font-black text-paragon-light">{{ p.lifetime_score }} Pts</span>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: EDIT SESSION CONFIGURATION -->
+    <div 
+      v-if="showEditSessionModal" 
+      class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
+    >
+      <div class="bg-dark-surface rounded-3xl border border-dark-border shadow-2xl w-full max-w-md p-6 space-y-6 text-dark-text">
+        <!-- Modal Header -->
+        <div class="flex justify-between items-center border-b border-dark-border pb-3">
+          <h3 class="font-black text-lg text-paragon-ice flex items-center space-x-2">
+            <Edit2 class="w-5 h-5 text-paragon-light" />
+            <span>Edit Konfigurasi Sesi</span>
+          </h3>
+          <button @click="showEditSessionModal = false" class="text-dark-text-secondary hover:text-white p-1.5 transition-colors">
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+
+        <!-- Modal Body / Form Fields -->
+        <div class="space-y-4 text-xs font-semibold text-paragon-light">
+          <div>
+            <label class="block mb-1.5 text-paragon-light uppercase tracking-widest text-[10px]">Tanggal Sesi</label>
+            <input 
+              v-model="editSessionForm.date" 
+              type="date" 
+              class="w-full bg-dark-surface-hover border border-dark-border text-dark-text rounded-xl px-3 py-2.5 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 transition-all"
+            />
+          </div>
+
+          <div>
+            <label class="block mb-1.5 text-paragon-light uppercase tracking-widest text-[10px]">PIC Sharing Session</label>
+            <select 
+              v-model="editSessionForm.pic_karyawan" 
+              class="w-full bg-dark-surface-hover border border-dark-border text-dark-text rounded-xl px-3 py-2.5 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 transition-all cursor-pointer"
+            >
+              <option v-for="p in picKaryawanChoices" :key="p.id" :value="p.name">{{ p.name }}</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block mb-1.5 text-paragon-light uppercase tracking-widest text-[10px]">PIC Reader</label>
+            <select 
+              v-model="editSessionForm.pic_intern" 
+              class="w-full bg-dark-surface-hover border border-dark-border text-dark-text rounded-xl px-3 py-2.5 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 transition-all cursor-pointer"
+            >
+              <option v-for="p in picInternChoices" :key="p.id" :value="p.name">{{ p.name }}</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block mb-1.5 text-paragon-light uppercase tracking-widest text-[10px]">Parmasys Reference</label>
+            <input 
+              v-model="editSessionForm.reference" 
+              type="text" 
+              placeholder="ex. Sharing Parmasys #42"
+              class="w-full bg-dark-surface-hover border border-dark-border text-dark-text rounded-xl px-3 py-2.5 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 transition-all font-medium"
+            />
+          </div>
+        </div>
+
+        <!-- Modal Footer / Action Buttons -->
+        <div class="flex items-center space-x-3 pt-2">
+          <button 
+            @click="saveEditSession"
+            class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center space-x-1 shadow"
+          >
+            <Check class="w-4 h-4" />
+            <span>Simpan</span>
+          </button>
+          <button 
+            @click="showEditSessionModal = false"
+            class="flex-1 py-2.5 bg-dark-surface-hover hover:bg-dark-border text-dark-text-secondary border border-dark-border font-bold rounded-xl text-xs transition-all flex items-center justify-center space-x-1"
+          >
+            <X class="w-4 h-4" />
+            <span>Batal</span>
+          </button>
         </div>
       </div>
     </div>
