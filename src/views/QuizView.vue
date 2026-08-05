@@ -293,7 +293,7 @@ async function submitAnswer(answerText) {
 async function fetchLeaderboard() {
   if (!sessionData.value) return
   try {
-    const res = await fetch(`${API_BASE}/admin/sessions/${sessionData.value.id}/active-stats?t=${Date.now()}`)
+    const res = await fetch(`${API_BASE}/sessions/${sessionData.value.id}/active-stats?t=${Date.now()}`)
     if (res.ok) {
       const data = await res.json()
       leaderboard.value = data.participants || []
