@@ -128,7 +128,7 @@ const getAvatarFileName = (participant) => {
                 />
               </div>
             </div>
-            <div class="text-xs font-bold text-paragon-light/70 truncate w-full max-w-20 text-center">{{ leaderboard[1]?.name || 'Peserta' }}</div>
+            <div class="text-[11px] sm:text-xs font-bold text-paragon-light/70 break-words w-full px-1 text-center line-clamp-2 leading-tight" :title="leaderboard[1]?.name">{{ leaderboard[1]?.name || 'Peserta' }}</div>
             <div class="text-xs font-black text-paragon-ice mt-1">{{ leaderboard[1]?.current_score || leaderboard[1]?.total_score || 0 }}⭐</div>
           </div>
           <!-- Hidden State Placeholder -->
@@ -165,7 +165,7 @@ const getAvatarFileName = (participant) => {
               </div>
               <div class="absolute -inset-1 bg-gradient-to-r from-amber-400 to-amber-600 rounded-full opacity-30 blur -z-10 animate-pulse"></div>
             </div>
-            <div class="text-xs font-extrabold text-amber-300 truncate w-full max-w-20 text-center">{{ leaderboard[0]?.name || 'Peserta' }}</div>
+            <div class="text-[11px] sm:text-xs font-extrabold text-amber-300 break-words w-full px-1 text-center line-clamp-2 leading-tight" :title="leaderboard[0]?.name">{{ leaderboard[0]?.name || 'Peserta' }}</div>
             <div class="text-sm font-black text-amber-300 mt-1">{{ leaderboard[0]?.current_score || leaderboard[0]?.total_score || 0 }}⭐</div>
           </div>
           <!-- Hidden State Placeholder -->
@@ -202,7 +202,7 @@ const getAvatarFileName = (participant) => {
                 />
               </div>
             </div>
-            <div class="text-xs font-bold text-orange-400 truncate w-full max-w-20 text-center">{{ leaderboard[2]?.name || 'Peserta' }}</div>
+            <div class="text-[11px] sm:text-xs font-bold text-orange-400 break-words w-full px-1 text-center line-clamp-2 leading-tight" :title="leaderboard[2]?.name">{{ leaderboard[2]?.name || 'Peserta' }}</div>
             <div class="text-xs font-black text-orange-300 mt-1">{{ leaderboard[2]?.current_score || leaderboard[2]?.total_score || 0 }}⭐</div>
           </div>
           <!-- Hidden State Placeholder -->

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Award, Play, History, UserCheck, HelpCircle, X, Trophy } from 'lucide-vue-next'
+import { Play, X } from 'lucide-vue-next'
 import ImmersiveAvatarCarousel from '../components/ImmersiveAvatarCarousel.vue'
 
 const router = useRouter()
@@ -204,7 +204,7 @@ async function handleLogin() {
       localStorage.setItem('otm_participant', JSON.stringify(participantWithAvatar))
       sessionStorage.setItem('otm_avatar', JSON.stringify(selectedAvatar))
       successMsg.value = `Selamat datang, ${data.participant.name}!`
-      fetchHistory(data.participant.id)
+      fetchSessionsOverview(data.participant.id)
       fetchLeaderboardTab(activeLeaderboardTab.value)
     } else {
       errorMsg.value = data.error || "Gagal masuk."
@@ -216,16 +216,22 @@ async function handleLogin() {
   }
 }
 
-// Fetch participant history
-async function fetchHistory(id) {
+// Fetch participant sessions overview
+const upcomingSessions = ref([])
+const pastSessions = ref([])
+const activeScheduleTab = ref('active')
+
+async function fetchSessionsOverview(id) {
   try {
-    const res = await fetch(`${API_BASE}/participants/${id}/history`)
+    const res = await fetch(`${API_BASE}/participants/${id}/sessions-overview`)
     if (res.ok) {
       const data = await res.json()
-      personalHistory.value = data.history
+      activeSession.value = data.active
+      upcomingSessions.value = data.upcoming || []
+      pastSessions.value = data.past || []
     }
   } catch (err) {
-    console.error("Gagal memuat riwayat skor:", err)
+    console.error("Gagal memuat jadwal briefing:", err)
   }
 }
 
@@ -243,6 +249,8 @@ function handleLogout() {
   selectedParticipantId.value = ''
   selectedAvatarId.value = null
   personalHistory.value = []
+  upcomingSessions.value = []
+  pastSessions.value = []
 }
 
 function getTopThreeAndMe(list) {
@@ -267,13 +275,21 @@ function getTopThreeAndMe(list) {
   return topThree
 }
 
+async function checkSessionsData() {
+  if (currentParticipant.value) {
+    await fetchSessionsOverview(currentParticipant.value.id)
+  } else {
+    await checkActiveSession()
+  }
+}
+
 onMounted(() => {
   fetchParticipants()
-  checkActiveSession()
+  checkSessionsData()
   fetchLeaderboardTab(activeLeaderboardTab.value)
   
   // Polling for active session status updates
-  sessionPoller = setInterval(checkActiveSession, 3000)
+  sessionPoller = setInterval(checkSessionsData, 3000)
 
   // Restore session and avatar from localStorage if exists
   const saved = localStorage.getItem('otm_participant')
@@ -288,7 +304,7 @@ onMounted(() => {
       } else if (parsed.avatar?.id) {
         selectedAvatarId.value = parsed.avatar.id
       }
-      fetchHistory(parsed.id)
+      fetchSessionsOverview(parsed.id)
     } catch (e) {
       localStorage.removeItem('otm_participant')
     }
@@ -387,85 +403,179 @@ onUnmounted(() => {
         </button>
       </div>
 
-      <!-- Live Session Status Banner -->
-      <div v-if="activeSession" class="bg-active-card-bg rounded-3xl shadow-2xl p-8 relative overflow-hidden border border-active-card-border">
-        <div class="relative z-10 space-y-5">
-          <div class="flex items-center space-x-2 text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 dark:bg-emerald-500/20 px-4 py-1.5 rounded-full w-max text-[10px] font-extrabold tracking-widest uppercase">
-            <span class="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse"></span>
-            <span>🔴 LIVE - Kuis Dimulai Sekarang!</span>
+      <!-- Jadwal morning briefing ETRM Card -->
+      <div class="bg-dark-surface rounded-3xl border border-dark-border shadow-xl p-6 sm:p-8 space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-dark-border pb-4 gap-4">
+          <div class="flex items-center space-x-3">
+            <h3 class="font-black text-lg text-paragon-ice">📅 Jadwal morning briefing ETRM</h3>
           </div>
-
-          <div class="space-y-2">
-            <h3 class="text-2xl font-black tracking-tight text-active-card-title">🎯 {{ activeSession.reference || 'Tema Sharing' }}</h3>
-            <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-active-card-text font-medium">
-              <div class="flex items-center space-x-2">
-                <span>👥 PIC:</span>
-                <strong class="text-active-card-title">{{ activeSession.pic_karyawan }} &amp; {{ activeSession.pic_intern }}</strong>
-              </div>
-              <span class="hidden md:inline text-active-card-text/40">•</span>
-              <div class="flex items-center space-x-2">
-                <span>📅</span>
-                <strong class="text-active-card-title">{{ activeSession.date }}</strong>
-              </div>
-            </div>
+          
+          <!-- Schedule Tab Buttons -->
+          <div class="flex w-full sm:w-auto bg-dark-surface-hover p-1 rounded-xl border border-dark-border max-w-full overflow-x-auto">
+            <button 
+              @click="activeScheduleTab = 'active'"
+              class="flex-grow sm:flex-initial px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap text-center flex items-center justify-center space-x-1.5"
+              :class="activeScheduleTab === 'active' ? 'bg-gradient-to-r from-paragon-medium to-paragon-dark text-white shadow' : 'text-dark-text-secondary hover:text-white'"
+            >
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span>Sesi Aktif</span>
+            </button>
+            <button 
+              @click="activeScheduleTab = 'upcoming'"
+              class="flex-grow sm:flex-initial px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap text-center"
+              :class="activeScheduleTab === 'upcoming' ? 'bg-gradient-to-r from-paragon-medium to-paragon-dark text-white shadow' : 'text-dark-text-secondary hover:text-white'"
+            >
+              Akan Datang
+            </button>
+            <button 
+              @click="activeScheduleTab = 'past'"
+              class="flex-grow sm:flex-initial px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap text-center"
+              :class="activeScheduleTab === 'past' ? 'bg-gradient-to-r from-paragon-medium to-paragon-dark text-white shadow' : 'text-dark-text-secondary hover:text-white'"
+            >
+              Selesai
+            </button>
           </div>
-
-          <button 
-            @click="joinQuiz" 
-            class="btn-join-quiz px-8 py-4 text-active-card-btn-text font-black rounded-2xl hover:shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center space-x-2 shadow-lg text-base"
-            style="background: var(--active-card-btn-bg);"
-          >
-            <Play class="icon-join-quiz w-5 h-5 fill-current" />
-            <span>🚀 Gabung Sesi Live</span>
-          </button>
-        </div>
-        
-        <!-- Animated Decor -->
-        <div class="absolute -right-16 -bottom-16 w-48 h-48 bg-paragon-light/5 rounded-full blur-3xl animate-pulse"></div>
-        <div class="absolute -left-8 -top-8 w-32 h-32 bg-emerald-400/5 rounded-full blur-2xl"></div>
-      </div>
-
-      <!-- No Active Session Card -->
-      <div v-else class="bg-dark-surface rounded-3xl p-8 text-center border border-dark-border space-y-3">
-        <h3 class="font-bold text-dark-text text-lg">⏳ Menunggu Sesi Kuis</h3>
-        <p class="text-sm text-dark-text-secondary leading-relaxed">
-          Sesi kuis live akan muncul di sini setelah Admin memulainya. Bersiaplah untuk berkompetisi! 🏆
-        </p>
-      </div>
-
-      <!-- Personal History Card -->
-      <div class="bg-dark-surface rounded-3xl border border-dark-border shadow-xl p-8 space-y-4">
-        <div class="flex items-center space-x-3 border-b border-dark-border pb-4">
-          <h3 class="font-black text-lg text-paragon-ice">📊 Riwayat Nilai Anda</h3>
         </div>
 
-        <div v-if="personalHistory.length === 0" class="text-center py-8 text-dark-text-secondary text-sm font-semibold">
-          💫 Belum ada riwayat kuis. Mulai sekarang dan raih poin!
-        </div>
+        <!-- 1. Active Session Tab -->
+        <div v-if="activeScheduleTab === 'active'" class="space-y-4">
+          <!-- Active Session Card -->
+          <div v-if="activeSession" class="bg-active-card-bg rounded-3xl shadow-2xl p-6 sm:p-8 relative overflow-hidden border border-active-card-border">
+            <div class="relative z-10 space-y-4">
+              <div class="flex items-center space-x-2 text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 dark:bg-emerald-500/20 px-4 py-1.5 rounded-full w-max text-[10px] font-extrabold tracking-widest uppercase">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse"></span>
+                <span>🔴 LIVE - Kuis Dimulai Sekarang!</span>
+              </div>
 
-        <div v-else class="space-y-3 max-h-80 overflow-y-auto pr-2">
-          <div 
-            v-for="h in personalHistory" 
-            :key="h.session_id" 
-            @click="viewSessionLeaderboard(h)"
-            class="p-4 rounded-2xl border border-dark-border bg-dark-surface-hover hover:bg-dark-surface hover:border-paragon-light/30 cursor-pointer flex items-center justify-between transition-all group"
-          >
-            <div class="space-y-1.5 flex-1">
-              <span class="text-[10px] font-extrabold text-paragon-light/60 uppercase">📅 {{ h.date }}</span>
-              <h4 class="font-bold text-sm text-paragon-ice tracking-tight leading-tight group-hover:text-paragon-light transition-colors">
-                🎯 {{ h.reference }}
-              </h4>
-              <p class="text-[11px] text-dark-text-secondary font-medium">
-                ✅ Benar: {{ h.correct_count }}/{{ h.total_answered }} • 👥 {{ h.pic_karyawan }} &amp; {{ h.pic_intern }}
-              </p>
+              <div class="space-y-2">
+                <h3 class="text-xl sm:text-2xl font-black tracking-tight text-active-card-title">🎯 {{ activeSession.reference }}</h3>
+                <p v-if="activeSession.topic" class="text-xs sm:text-sm text-active-card-text/90 italic font-medium leading-relaxed max-w-lg bg-black/10 p-3.5 rounded-xl border border-white/5">
+                  📝 {{ activeSession.topic }}
+                </p>
+                
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs sm:text-sm text-active-card-text font-medium pt-1">
+                  <div class="flex items-center space-x-2">
+                    <span>👥 PIC:</span>
+                    <strong class="text-active-card-title">{{ activeSession.pic_karyawan }} &amp; {{ activeSession.pic_intern }}</strong>
+                  </div>
+                  <span class="text-active-card-text/40">•</span>
+                  <div class="flex items-center space-x-2">
+                    <span>📅</span>
+                    <strong class="text-active-card-title">{{ activeSession.date }}</strong>
+                  </div>
+                </div>
+              </div>
+
+              <button 
+                @click="joinQuiz" 
+                class="btn-join-quiz px-8 py-3.5 text-active-card-btn-text font-black rounded-2xl hover:shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center space-x-2 shadow-lg text-sm sm:text-base w-full sm:w-auto"
+                style="background: var(--active-card-btn-bg);"
+              >
+                <Play class="icon-join-quiz w-5 h-5 fill-current" />
+                <span>🚀 Gabung Sesi Live</span>
+              </button>
             </div>
             
-            <div class="text-right space-y-2 ml-4 flex-shrink-0">
-              <div class="text-lg font-black text-paragon-light">
-                {{ h.score }}⭐
+            <!-- Animated Decor -->
+            <div class="absolute -right-16 -bottom-16 w-48 h-48 bg-paragon-light/5 rounded-full blur-3xl animate-pulse"></div>
+            <div class="absolute -left-8 -top-8 w-32 h-32 bg-emerald-400/5 rounded-full blur-2xl"></div>
+          </div>
+
+          <!-- No Active Session Card -->
+          <div v-else class="bg-dark-surface-hover rounded-2xl p-8 text-center border border-dark-border space-y-3">
+            <h4 class="font-bold text-dark-text text-base">⏳ Belum Ada Sesi Aktif</h4>
+            <p class="text-xs text-dark-text-secondary leading-relaxed max-w-sm mx-auto">
+              Briefing ETRM belum dimulai oleh admin. Sesi live kuis akan muncul di sini secara otomatis. Bersiaplah! 🏆
+            </p>
+          </div>
+        </div>
+
+        <!-- 2. Upcoming Session Tab -->
+        <div v-else-if="activeScheduleTab === 'upcoming'" class="space-y-4">
+          <div v-if="upcomingSessions.length === 0" class="bg-dark-surface-hover rounded-2xl p-8 text-center border border-dark-border">
+            <p class="text-xs text-dark-text-secondary">📅 Belum ada jadwal briefing mendatang yang direncanakan.</p>
+          </div>
+          
+          <div v-else class="space-y-3 max-h-80 overflow-y-auto pr-2">
+            <div 
+              v-for="s in upcomingSessions" 
+              :key="s.id"
+              class="p-4 rounded-2xl border border-dark-border bg-dark-surface-hover hover:border-paragon-light/20 flex flex-col space-y-3 transition-all"
+            >
+              <div class="flex justify-between items-start">
+                <div class="space-y-1">
+                  <span class="text-[9px] font-extrabold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full uppercase tracking-wider">Akan Datang</span>
+                  <h4 class="font-bold text-sm text-paragon-ice leading-tight pt-1">🎯 {{ s.reference }}</h4>
+                </div>
+                <span class="text-[10px] font-bold text-dark-text-secondary">📅 {{ s.date }}</span>
               </div>
-              <div class="text-[10px] font-bold bg-gradient-to-r from-paragon-medium/30 to-paragon-dark/30 text-paragon-ice px-2.5 py-1 rounded-full inline-block border border-paragon-medium/20">
-                🏆 #{{ h.rank }}/{{ h.total_participants }}
+              
+              <p v-if="s.topic" class="text-xs text-dark-text-secondary italic leading-relaxed bg-dark-surface p-2.5 rounded-xl border border-dark-border/40 text-left">
+                {{ s.topic }}
+              </p>
+              
+              <div class="text-[11px] text-dark-text-secondary font-medium text-left">
+                👥 PIC: <strong class="text-paragon-light">{{ s.pic_karyawan }} &amp; {{ s.pic_intern }}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Past Session Tab (History) -->
+        <div v-else-if="activeScheduleTab === 'past'" class="space-y-4">
+          <div v-if="pastSessions.length === 0" class="bg-dark-surface-hover rounded-2xl p-8 text-center border border-dark-border">
+            <p class="text-xs text-dark-text-secondary">📊 Belum ada riwayat sesi briefing yang diselesaikan.</p>
+          </div>
+
+          <div v-else class="space-y-3 max-h-80 overflow-y-auto pr-2">
+            <div 
+              v-for="h in pastSessions" 
+              :key="h.session_id" 
+              @click="viewSessionLeaderboard(h)"
+              class="p-4 rounded-2xl border cursor-pointer flex flex-col space-y-3 transition-all group"
+              :class="h.joined 
+                ? 'border-emerald-500/20 bg-emerald-500/[0.02] hover:border-emerald-500/40' 
+                : 'border-dark-border bg-dark-surface-hover hover:border-paragon-light/20'"
+            >
+              <div class="flex justify-between items-start gap-4">
+                <div class="space-y-1.5 flex-1 text-left">
+                  <div class="flex items-center space-x-2 flex-wrap gap-y-1">
+                    <span class="text-[10px] font-extrabold text-paragon-light/60 uppercase">📅 {{ h.date }}</span>
+                    <span 
+                      class="text-[9px] font-bold px-2 py-0.5 rounded-full border"
+                      :class="h.joined 
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                        : 'bg-slate-500/10 text-slate-400 border-slate-500/20'"
+                    >
+                      {{ h.joined ? '✅ Tergabung' : '❌ Tidak Tergabung' }}
+                    </span>
+                  </div>
+                  <h4 class="font-bold text-sm text-paragon-ice tracking-tight leading-tight group-hover:text-paragon-light transition-colors">
+                    🎯 {{ h.reference }}
+                  </h4>
+                </div>
+                
+                <!-- Rank and Score Display (Only shown if joined) -->
+                <div v-if="h.joined" class="text-right space-y-1 ml-4 flex-shrink-0">
+                  <div class="text-base font-black text-paragon-light">
+                    {{ h.score }}⭐
+                  </div>
+                  <div class="text-[10px] font-bold bg-gradient-to-r from-paragon-medium/30 to-paragon-dark/30 text-paragon-ice px-2.5 py-0.5 rounded-full inline-block border border-paragon-medium/20">
+                    🏆 #{{ h.rank }}/{{ h.total_participants }}
+                  </div>
+                </div>
+                <div v-else class="text-right ml-4 flex-shrink-0 text-[10px] font-semibold text-slate-500 italic">
+                  Peringkat: -
+                </div>
+              </div>
+              
+              <p v-if="h.topic" class="text-xs text-dark-text-secondary italic leading-relaxed bg-dark-surface/50 p-2.5 rounded-xl border border-dark-border/40 text-left">
+                {{ h.topic }}
+              </p>
+
+              <div class="flex justify-between items-center text-[10px] text-dark-text-secondary font-medium">
+                <span>👥 {{ h.pic_karyawan }} &amp; {{ h.pic_intern }}</span>
+                <span v-if="h.joined" class="text-paragon-light/80 font-bold">✅ Benar: {{ h.correct_count }}/{{ h.total_answered }}</span>
               </div>
             </div>
           </div>
@@ -527,7 +637,7 @@ onUnmounted(() => {
               >
                 <div class="flex items-center space-x-3 flex-1 min-w-0">
                   <span class="w-5 text-slate-500 font-extrabold text-[10px]">#{{ p.actualRank || (idx + 1) }}</span>
-                  <span class="truncate text-dark-text leading-tight">{{ p.name }}</span>
+                  <span class="truncate text-dark-text leading-tight" :title="p.name">{{ p.name }}</span>
                   <span v-if="p.participant_id == currentParticipant?.id" class="text-[8px] bg-gradient-to-r from-accent-cyan to-paragon-medium text-white px-2 py-0.5 rounded-full font-bold ml-2 flex-shrink-0">⭐ Anda</span>
                 </div>
                 <span class="text-xs font-black text-paragon-light">{{ p.total_score }} Pts</span>
@@ -579,7 +689,7 @@ onUnmounted(() => {
                   >
                     <div class="flex items-center space-x-3 flex-1 min-w-0 pr-4">
                       <span class="w-5 text-slate-500 font-extrabold text-[10px]">#{{ p.actualRank || (idx + 1) }}</span>
-                      <span class="truncate text-dark-text leading-tight">{{ p.name }}</span>
+                      <span class="truncate text-dark-text leading-tight" :title="p.name">{{ p.name }}</span>
                       <span v-if="p.participant_id == currentParticipant?.id" class="text-[8px] bg-gradient-to-r from-accent-cyan to-paragon-medium text-white px-2 py-0.5 rounded-full font-bold ml-2 flex-shrink-0">⭐ Anda</span>
                     </div>
                     <div class="flex space-x-3 text-[10px] font-bold text-slate-400 flex-shrink-0">
@@ -616,7 +726,7 @@ onUnmounted(() => {
               >
                 <div class="flex items-center space-x-3 flex-1 min-w-0">
                   <span class="w-5 text-slate-500 font-extrabold text-[10px]">#{{ p.actualRank || (idx + 1) }}</span>
-                  <span class="text-dark-text truncate leading-tight">{{ p.name }}</span>
+                  <span class="text-dark-text truncate leading-tight" :title="p.name">{{ p.name }}</span>
                   <span v-if="p.participant_id == currentParticipant?.id" class="text-[8px] bg-gradient-to-r from-accent-cyan to-paragon-medium text-white px-2 py-0.5 rounded-full font-bold ml-2 flex-shrink-0">⭐ Anda</span>
                 </div>
                 <span class="text-xs font-black text-paragon-light">{{ p.lifetime_score }} Pts</span>

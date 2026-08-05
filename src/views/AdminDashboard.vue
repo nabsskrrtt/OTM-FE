@@ -222,9 +222,9 @@ watch(
 )
 
 // Form states
-const sessionForm = ref({ date: new Date().toISOString().split('T')[0], pic_karyawan: '', pic_intern: '', reference: '' })
+const sessionForm = ref({ date: new Date().toISOString().split('T')[0], pic_karyawan: '', pic_intern: '', reference: '', topic: '' })
 const showEditSessionModal = ref(false)
-const editSessionForm = ref({ date: '', pic_karyawan: '', pic_intern: '', reference: '' })
+const editSessionForm = ref({ date: '', pic_karyawan: '', pic_intern: '', reference: '', topic: '' })
 const participantForm = ref({ name: '' })
 const editingParticipant = ref(null)
 
@@ -604,7 +604,8 @@ function startEditSession() {
     date: activeSession.value.date,
     pic_karyawan: activeSession.value.pic_karyawan,
     pic_intern: activeSession.value.pic_intern,
-    reference: activeSession.value.reference
+    reference: activeSession.value.reference,
+    topic: activeSession.value.topic || ''
   }
   showEditSessionModal.value = true
 }
@@ -1455,6 +1456,16 @@ function getOptionSubmitPercentage(option) {
               />
             </div>
 
+            <div>
+              <label class="block text-xs font-bold text-paragon-light mb-1.5">Topik</label>
+              <textarea 
+                v-model="sessionForm.topic" 
+                rows="3"
+                placeholder="ex. Dalam pengalaman saya, budaya apa yang paling membantu tim..."
+                class="w-full bg-dark-surface-hover border border-dark-border text-dark-text text-xs font-semibold rounded-xl px-3 py-2.5 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 placeholder-dark-text-secondary/30 resize-none"
+              ></textarea>
+            </div>
+
             <button 
               @click="createSession" 
               class="w-full py-2.5 bg-paragon-medium text-white font-bold rounded-xl text-xs hover:bg-paragon-dark shadow transition-all flex items-center justify-center space-x-1"
@@ -1522,30 +1533,36 @@ function getOptionSubmitPercentage(option) {
         <!-- Active session workspace -->
         <div v-else class="space-y-6">
           <!-- Session details card with Presentation Buttons moved inside -->
-          <div class="p-5 rounded-2xl bg-dark-surface border border-dark-border flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs flex-1">
-              <div><span class="text-dark-text-secondary block mb-0.5">PIC Sharing &amp; Reader</span><strong class="text-dark-text">{{ activeSession.pic_karyawan }} &amp; {{ activeSession.pic_intern }}</strong></div>
-              <div><span class="text-dark-text-secondary block mb-0.5">Parmasys Reference</span><strong class="truncate block max-w-[150px] text-dark-text">{{ activeSession.reference }}</strong></div>
-              <div><span class="text-dark-text-secondary block mb-0.5">Tanggal Sesi</span><strong class="text-dark-text">{{ activeSession.date }}</strong></div>
-              <div><span class="text-dark-text-secondary block mb-0.5">Status Sesi</span><strong class="uppercase text-paragon-light block">{{ activeSession.status }}</strong></div>
-            </div>
+          <div class="p-5 rounded-2xl bg-dark-surface border border-dark-border flex flex-col gap-4">
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs flex-1">
+                <div><span class="text-dark-text-secondary block mb-0.5">PIC Sharing &amp; Reader</span><strong class="text-dark-text">{{ activeSession.pic_karyawan }} &amp; {{ activeSession.pic_intern }}</strong></div>
+                <div><span class="text-dark-text-secondary block mb-0.5">Parmasys Reference</span><strong class="truncate block max-w-[150px] text-dark-text">{{ activeSession.reference }}</strong></div>
+                <div><span class="text-dark-text-secondary block mb-0.5">Tanggal Sesi</span><strong class="text-dark-text">{{ activeSession.date }}</strong></div>
+                <div><span class="text-dark-text-secondary block mb-0.5">Status Sesi</span><strong class="uppercase text-paragon-light block">{{ activeSession.status }}</strong></div>
+              </div>
 
-            <!-- Presentation & Edit Buttons -->
-            <div class="flex items-center space-x-2 flex-shrink-0">
-              <button 
-                @click="startEditSession"
-                class="px-3 py-2.5 bg-dark-surface hover:bg-dark-surface-hover text-dark-text border border-dark-border rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5"
-              >
-                <Edit2 class="w-3.5 h-3.5 text-paragon-light" />
-                <span>Edit Sesi</span>
-              </button>
-              <button 
-                @click="showPresentationMode = true"
-                class="px-3.5 py-2.5 bg-paragon-medium hover:bg-paragon-dark text-white rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 shadow-sm"
-              >
-                <Tv class="w-3.5 h-3.5" />
-                <span>Layar Presentasi</span>
-              </button>
+              <!-- Presentation & Edit Buttons -->
+              <div class="flex items-center space-x-2 flex-shrink-0">
+                <button 
+                  @click="startEditSession"
+                  class="px-3 py-2.5 bg-dark-surface hover:bg-dark-surface-hover text-dark-text border border-dark-border rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5"
+                >
+                  <Edit2 class="w-3.5 h-3.5 text-paragon-light" />
+                  <span>Edit Sesi</span>
+                </button>
+                <button 
+                  @click="showPresentationMode = true"
+                  class="px-3.5 py-2.5 bg-paragon-medium hover:bg-paragon-dark text-white rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 shadow-sm"
+                >
+                  <Tv class="w-3.5 h-3.5" />
+                  <span>Layar Presentasi</span>
+                </button>
+              </div>
+            </div>
+            <div v-if="activeSession.topic" class="text-xs border-t border-dark-border/40 pt-3">
+              <span class="text-dark-text-secondary block mb-1">Topik Sesi:</span>
+              <p class="text-dark-text leading-relaxed font-semibold italic">{{ activeSession.topic }}</p>
             </div>
           </div>
 
@@ -1817,11 +1834,11 @@ function getOptionSubmitPercentage(option) {
         <div class="space-y-4">
           <h3 class="font-extrabold text-base text-paragon-light border-b border-dark-border pb-3">Tambah Peserta</h3>
           <div>
-            <label class="block text-xs font-bold text-paragon-light mb-1.5">Nama Karyawan / Intern</label>
+            <label class="block text-xs font-bold text-paragon-light mb-1.5">Nama Peserta</label>
             <input 
               v-model="participantForm.name" 
               type="text" 
-              placeholder="e.g. Nama Karyawan Baru"
+              placeholder="e.g. Nama Peserta Baru"
               class="w-full bg-dark-surface-hover border border-dark-border text-dark-text text-xs font-semibold rounded-xl px-3 py-2.5 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 placeholder-dark-text-secondary/30"
             />
           </div>
@@ -2186,6 +2203,16 @@ function getOptionSubmitPercentage(option) {
               placeholder="ex. Sharing Parmasys #42"
               class="w-full bg-dark-surface-hover border border-dark-border text-dark-text rounded-xl px-3 py-2.5 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 transition-all font-medium"
             />
+          </div>
+
+          <div>
+            <label class="block mb-1.5 text-paragon-light uppercase tracking-widest text-[10px]">Topik</label>
+            <textarea 
+              v-model="editSessionForm.topic" 
+              rows="3"
+              placeholder="ex. Dalam pengalaman saya, budaya apa yang paling membantu tim..."
+              class="w-full bg-dark-surface-hover border border-dark-border text-dark-text rounded-xl px-3 py-2.5 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 transition-all font-medium resize-none"
+            ></textarea>
           </div>
         </div>
 

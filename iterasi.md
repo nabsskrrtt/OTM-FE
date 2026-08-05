@@ -1,1 +1,0 @@
-- di view participant, peringkat umum nya yang ditampilin yang top 3 plus urutan dianya ajaa
