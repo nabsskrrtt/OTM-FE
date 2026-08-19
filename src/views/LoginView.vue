@@ -1,8 +1,110 @@
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Play, X } from 'lucide-vue-next'
 import ImmersiveAvatarCarousel from '../components/ImmersiveAvatarCarousel.vue'
+
+// Cascading and Nickname login state
+const selectedDepartment = ref('')
+const selectedDivision = ref('')
+const participantNickname = ref('')
+const loginMode = ref('participant')
+
+const divisionsList = ref([])
+const adminDepartments = ref([])
+const adminSelectedDept = ref('')
+
+async function fetchDivisions() {
+  try {
+    const res = await fetch(`${API_BASE}/divisions`)
+    if (res.ok) {
+      divisionsList.value = await res.json()
+    }
+  } catch (err) {
+    console.error("Gagal memuat divisi:", err)
+  }
+}
+
+async function fetchAdminDepartments() {
+  try {
+    const res = await fetch(`${API_BASE}/admin/departments`)
+    if (res.ok) {
+      adminDepartments.value = await res.json()
+    }
+  } catch (err) {
+    console.error("Gagal memuat departemen admin:", err)
+  }
+}
+
+async function handleForgetPassword() {
+  if (!adminSelectedDept.value) {
+    errorMsg.value = "Pilih departemen terlebih dahulu sebelum meminta reset password."
+    return
+  }
+  if (adminSelectedDept.value === 'Super Admin') {
+    errorMsg.value = "Akun Super Admin tidak dapat direset dengan cara ini."
+    return
+  }
+  errorMsg.value = ''
+  successMsg.value = ''
+  try {
+    loading.value = true
+    const res = await fetch(`${API_BASE}/admin/forget-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ department: adminSelectedDept.value })
+    })
+    const data = await res.json()
+    if (res.ok) {
+      successMsg.value = "Permintaan reset password telah dikirim ke Super Admin."
+    } else {
+      errorMsg.value = data.error || "Gagal mengirim permintaan reset."
+    }
+  } catch (err) {
+    errorMsg.value = "Koneksi ke backend gagal."
+  } finally {
+    loading.value = false
+  }
+}
+
+// Filter unique departments from divisionsList
+const departments = computed(() => {
+  const depts = new Set()
+  divisionsList.value.forEach(d => {
+    if (d.department) {
+      depts.add(d.department)
+    }
+  })
+  return Array.from(depts).sort()
+})
+
+// Filter unique divisions under selected department
+const divisions = computed(() => {
+  if (!selectedDepartment.value) return []
+  return divisionsList.value
+    .filter(d => d.department === selectedDepartment.value)
+    .map(d => d.name)
+    .sort()
+})
+
+// Filter participants by selected department and division
+const filteredParticipants = computed(() => {
+  if (!selectedDepartment.value || !selectedDivision.value) return []
+  return participantsList.value.filter(p => 
+    p.id !== 'admin' && 
+    p.department === selectedDepartment.value && 
+    p.division === selectedDivision.value
+  )
+})
+
+watch(selectedDepartment, () => {
+  selectedDivision.value = ''
+  selectedParticipantId.value = ''
+})
+
+watch(selectedDivision, () => {
+  selectedParticipantId.value = ''
+})
 
 const router = useRouter()
 const API_HOST = import.meta.env.VITE_API_URL || 'http://localhost:3000'
@@ -165,20 +267,31 @@ async function handleLogin() {
       const res = await fetch(`${API_BASE}/admin/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ passcode: adminPin.value })
+        body: JSON.stringify({ department: adminSelectedDept.value, passcode: adminPin.value })
       })
       const data = await res.json()
       if (res.ok && data.success) {
         localStorage.setItem('otm_admin_token', data.token)
+        localStorage.setItem('otm_admin_dept', data.department)
         router.push('/admin')
       } else {
-        errorMsg.value = data.error || "PIN Admin salah."
+        errorMsg.value = data.error || "Password Admin salah."
       }
     } catch (err) {
       errorMsg.value = "Koneksi ke backend gagal."
     } finally {
       loading.value = false
     }
+    return
+  }
+
+  if (!participantNickname.value.trim()) {
+    errorMsg.value = "Nickname wajib diisi!"
+    return
+  }
+
+  if (participantNickname.value.trim().length > 15) {
+    errorMsg.value = "Nickname maksimal 15 karakter!"
     return
   }
 
@@ -190,7 +303,11 @@ async function handleLogin() {
     const res = await fetch(`${API_BASE}/participants/join`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: selectedObj.name, avatar_id: selectedAvatarId.value })
+      body: JSON.stringify({ 
+        name: selectedObj.name, 
+        avatar_id: selectedAvatarId.value,
+        nickname: participantNickname.value.trim()
+      })
     })
 
     const data = await res.json()
@@ -248,6 +365,12 @@ function handleLogout() {
   currentParticipant.value = null
   selectedParticipantId.value = ''
   selectedAvatarId.value = null
+  selectedDepartment.value = ''
+  selectedDivision.value = ''
+  participantNickname.value = ''
+  loginMode.value = 'participant'
+  adminSelectedDept.value = ''
+  adminPin.value = ''
   personalHistory.value = []
   upcomingSessions.value = []
   pastSessions.value = []
@@ -284,6 +407,8 @@ async function checkSessionsData() {
 }
 
 onMounted(() => {
+  fetchDivisions()
+  fetchAdminDepartments()
   fetchParticipants()
   checkSessionsData()
   fetchLeaderboardTab(activeLeaderboardTab.value)
@@ -335,43 +460,133 @@ onUnmounted(() => {
           <span class="bg-clip-text text-transparent bg-gradient-to-r from-accent-cyan via-paragon-light to-paragon-medium">Selamat Pagi!</span> ☀️
         </h2>
         <p class="text-sm text-dark-text-secondary max-w-sm mx-auto leading-relaxed font-semibold bg-clip-text text-transparent bg-gradient-to-r from-slate-200 to-slate-400">
-          Silakan pilih avatar dan nama Anda untuk bersiap mengikuti sharing morning briefing hari ini!
+          Silakan pilih avatar, departemen, divisi, dan nama Anda untuk bersiap mengikuti sharing morning briefing hari ini!
         </p>
       </div>
 
-      <div class="space-y-6">
-        <!-- Immersive Avatar Selection Carousel -->
-        <ImmersiveAvatarCarousel v-model="selectedAvatarId" :avatars="avatarOptions" />
+      <!-- Tabs for Login Mode: Participant vs Admin -->
+      <div class="flex bg-dark-surface p-1 rounded-2xl border border-dark-border shadow-inner">
+        <button 
+          @click="loginMode = 'participant'; selectedParticipantId = ''"
+          type="button"
+          class="flex-1 py-3 rounded-xl text-sm font-black transition-all text-center flex items-center justify-center space-x-2 cursor-pointer"
+          :class="loginMode === 'participant' ? 'bg-gradient-to-r from-paragon-medium to-paragon-dark text-white shadow-lg shadow-paragon-medium/20 scale-[1.02]' : 'text-dark-text-secondary hover:text-dark-text hover:bg-dark-surface-hover/50'"
+        >
+          <span>👤 Peserta</span>
+        </button>
+        <button 
+          @click="loginMode = 'admin'; selectedParticipantId = ''" 
+          type="button"
+          class="flex-1 py-3 rounded-xl text-sm font-black transition-all text-center flex items-center justify-center space-x-2 cursor-pointer"
+          :class="loginMode === 'admin' ? 'bg-gradient-to-r from-paragon-medium to-paragon-dark text-white shadow-lg shadow-paragon-medium/20 scale-[1.02]' : 'text-dark-text-secondary hover:text-dark-text hover:bg-dark-surface-hover/50'"
+        >
+          <span>🔑 Admin / PIC</span>
+        </button>
+      </div>
 
-        <!-- Participant Selection -->
-        <div>
-          <label class="block text-xs font-bold text-paragon-light uppercase tracking-widest mb-3">Nama Anda</label>
-          <select 
-            v-model="selectedParticipantId" 
-            class="w-full bg-dark-surface-hover border border-dark-border focus:border-paragon-medium focus:bg-dark-surface text-dark-text rounded-2xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-paragon-medium/30 transition-all outline-none cursor-pointer hover:border-paragon-light/30"
-          >
-            <option value="" disabled>-- Pilih Nama Anda --</option>
-            <option v-for="p in participantsList" :key="p.id" :value="p.id">
-              {{ p.name }}
-            </option>
-          </select>
-        </div>
-        
-        <div v-if="selectedParticipantId === 'admin'" class="space-y-3 bg-dark-surface-hover border border-amber-500/20 rounded-2xl p-4">
-          <label class="block text-xs font-bold text-amber-400 uppercase tracking-widest">PIN Administrator</label>
-          <input 
-            v-model="adminPin" 
-            type="password" 
-            placeholder="••••••"
-            class="w-full bg-dark-surface border border-dark-border focus:border-amber-500 text-dark-text rounded-xl px-4 py-3 text-sm font-semibold outline-none transition-all tracking-widest text-center hover:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20"
-            @keyup.enter="handleLogin"
-          />
+      <div class="space-y-6">
+        <template v-if="loginMode === 'participant'">
+          <!-- Immersive Avatar Selection Carousel -->
+          <ImmersiveAvatarCarousel v-model="selectedAvatarId" :avatars="avatarOptions" />
+
+          <!-- Department Selection -->
+          <div>
+            <label class="block text-xs font-bold text-paragon-light uppercase tracking-widest mb-3">Departemen</label>
+            <select 
+              v-model="selectedDepartment" 
+              class="w-full bg-dark-surface-hover border border-dark-border focus:border-paragon-medium focus:bg-dark-surface text-dark-text rounded-2xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-paragon-medium/30 transition-all outline-none cursor-pointer hover:border-paragon-light/30"
+            >
+              <option value="" disabled>-- Pilih Departemen --</option>
+              <option v-for="dept in departments" :key="dept" :value="dept">
+                {{ dept }}
+              </option>
+            </select>
+          </div>
+
+          <!-- Division Selection -->
+          <div v-if="selectedDepartment">
+            <label class="block text-xs font-bold text-paragon-light uppercase tracking-widest mb-3">Divisi</label>
+            <select 
+              v-model="selectedDivision" 
+              class="w-full bg-dark-surface-hover border border-dark-border focus:border-paragon-medium focus:bg-dark-surface text-dark-text rounded-2xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-paragon-medium/30 transition-all outline-none cursor-pointer hover:border-paragon-light/30"
+            >
+              <option value="" disabled>-- Pilih Divisi --</option>
+              <option v-for="div in divisions" :key="div" :value="div">
+                {{ div }}
+              </option>
+            </select>
+          </div>
+
+          <!-- Participant Selection -->
+          <div v-if="selectedDivision">
+            <label class="block text-xs font-bold text-paragon-light uppercase tracking-widest mb-3">Nama Anda</label>
+            <select 
+              v-model="selectedParticipantId" 
+              class="w-full bg-dark-surface-hover border border-dark-border focus:border-paragon-medium focus:bg-dark-surface text-dark-text rounded-2xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-paragon-medium/30 transition-all outline-none cursor-pointer hover:border-paragon-light/30"
+            >
+              <option value="" disabled>-- Pilih Nama Anda --</option>
+              <option v-for="p in filteredParticipants" :key="p.id" :value="p.id">
+                {{ p.name }}
+              </option>
+            </select>
+          </div>
+
+          <!-- Nickname Input -->
+          <div v-if="selectedParticipantId">
+            <label class="block text-xs font-bold text-paragon-light uppercase tracking-widest mb-3">Nickname Anda</label>
+            <input 
+              v-model="participantNickname" 
+              type="text" 
+              placeholder="Masukkan nickname (untuk kuis & leaderboard)"
+              maxlength="15"
+              class="w-full bg-dark-surface-hover border border-dark-border focus:border-paragon-medium focus:bg-dark-surface text-dark-text rounded-2xl px-4 py-3 text-sm font-semibold focus:ring-2 focus:ring-paragon-medium/30 transition-all outline-none"
+            />
+          </div>
+        </template>
+
+        <div v-if="loginMode === 'admin'" class="space-y-4">
+          <!-- Department Select for Admin -->
+          <div>
+            <label class="block text-xs font-bold text-paragon-light uppercase tracking-widest mb-3">Departemen Admin</label>
+            <select 
+              v-model="adminSelectedDept" 
+              class="w-full bg-dark-surface-hover border border-dark-border focus:border-paragon-medium focus:bg-dark-surface text-dark-text rounded-2xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-paragon-medium/30 transition-all outline-none cursor-pointer hover:border-paragon-light/30"
+            >
+              <option value="" disabled>-- Pilih Departemen Admin --</option>
+              <option value="Super Admin">Super Admin</option>
+              <option v-for="dept in adminDepartments" :key="dept" :value="dept">
+                {{ dept }}
+              </option>
+            </select>
+          </div>
+
+          <!-- Password for Admin -->
+          <div v-if="adminSelectedDept">
+            <div class="flex justify-between items-center mb-3">
+              <label class="block text-xs font-bold text-paragon-light uppercase tracking-widest">Password Admin</label>
+              <button 
+                v-if="adminSelectedDept !== 'Super Admin'"
+                type="button" 
+                @click="handleForgetPassword"
+                class="text-[10px] font-bold text-accent-cyan hover:underline transition-all cursor-pointer bg-transparent border-none outline-none"
+              >
+                Lupa Password?
+              </button>
+            </div>
+            <input 
+              v-model="adminPin" 
+              type="password" 
+              placeholder="••••••••"
+              class="w-full bg-dark-surface-hover border border-dark-border focus:border-paragon-medium text-dark-text rounded-2xl px-4 py-3 text-sm font-semibold focus:ring-2 focus:ring-paragon-medium/30 transition-all outline-none"
+              @keyup.enter="handleLogin"
+            />
+          </div>
         </div>
 
         <button 
           @click="handleLogin" 
-          :disabled="!selectedParticipantId || !selectedAvatarId || loading"
-          class="w-full py-3.5 bg-gradient-to-r from-paragon-medium to-paragon-dark text-white font-extrabold rounded-2xl shadow-lg shadow-paragon-medium/30 hover:shadow-paragon-dark/40 hover:scale-105 active:scale-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100 disabled:shadow-none transition-all flex items-center justify-center space-x-2 text-base"
+          :disabled="(loginMode === 'participant' && (!selectedParticipantId || !selectedAvatarId || !participantNickname.trim())) || (loginMode === 'admin' && (!adminSelectedDept || !adminPin)) || loading"
+          class="w-full py-3.5 bg-gradient-to-r from-paragon-medium to-paragon-dark text-white font-extrabold rounded-2xl shadow-lg shadow-paragon-medium/30 hover:shadow-paragon-dark/40 hover:scale-105 active:scale-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100 disabled:shadow-none transition-all flex items-center justify-center space-x-2 text-base cursor-pointer"
         >
           <span>🚀 Masuk Portal</span>
         </button>
@@ -392,14 +607,25 @@ onUnmounted(() => {
           </div>
           <div>
             <span class="text-[10px] uppercase font-extrabold tracking-widest text-paragon-light">Masuk Sebagai</span>
-            <h2 class="text-xl font-black bg-clip-text text-transparent bg-gradient-to-r from-paragon-ice to-paragon-light mt-0.5">{{ currentParticipant.name }}</h2>
+            <h2 class="text-xl font-black bg-clip-text text-transparent bg-gradient-to-r from-paragon-ice to-paragon-light mt-0.5">
+              {{ currentParticipant.nickname || currentParticipant.name }}
+              <span class="text-xs text-dark-text-secondary font-medium ml-1">({{ currentParticipant.name }})</span>
+            </h2>
+            <div class="flex flex-wrap items-center gap-2 mt-1.5">
+              <span class="px-2.5 py-0.5 rounded-md text-[9px] font-black bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/20 flex items-center gap-1">
+                🏢 {{ currentParticipant.department }}
+              </span>
+              <span class="px-2.5 py-0.5 rounded-md text-[9px] font-black bg-paragon-light/10 text-paragon-light border border-dark-border flex items-center gap-1">
+                🔧 {{ currentParticipant.division }}
+              </span>
+            </div>
           </div>
         </div>
         <button 
           @click="handleLogout" 
-          class="px-4 py-2.5 border border-dark-border text-xs font-bold text-dark-text-secondary hover:bg-dark-surface-hover hover:border-paragon-light/30 rounded-xl transition-all"
+          class="px-4 py-2.5 border border-red-500/20 text-xs font-black text-red-400 bg-red-500/5 hover:bg-red-500/10 hover:border-red-500/40 rounded-xl transition-all cursor-pointer"
         >
-          Ganti Nama
+          Keluar
         </button>
       </div>
 
@@ -407,7 +633,7 @@ onUnmounted(() => {
       <div class="bg-dark-surface rounded-3xl border border-dark-border shadow-xl p-6 sm:p-8 space-y-6">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-dark-border pb-4 gap-4">
           <div class="flex items-center space-x-3">
-            <h3 class="font-black text-lg text-paragon-ice">📅 Jadwal morning briefing ETRM</h3>
+            <h3 class="font-black text-lg text-paragon-ice">📅 Jadwal Morning Briefing {{ currentParticipant.department }}</h3>
           </div>
           
           <!-- Schedule Tab Buttons -->

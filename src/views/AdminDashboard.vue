@@ -27,9 +27,11 @@ onMounted(() => {
 
   const token = localStorage.getItem('otm_admin_token')
   if (!token) {
-    router.push('/admin/login')
+    router.push('/')
     return
   }
+  
+  adminDept.value = localStorage.getItem('otm_admin_dept') || 'ETRM'
   
   const params = new URLSearchParams(window.location.search)
   if (params.get('presentation') === 'true') {
@@ -225,8 +227,239 @@ watch(
 const sessionForm = ref({ date: new Date().toISOString().split('T')[0], pic_karyawan: '', pic_intern: '', reference: '', topic: '' })
 const showEditSessionModal = ref(false)
 const editSessionForm = ref({ date: '', pic_karyawan: '', pic_intern: '', reference: '', topic: '' })
-const participantForm = ref({ name: '' })
+const participantForm = ref({ name: '', department: '', division: '' })
 const editingParticipant = ref(null)
+
+// Autocomplete suggestions for department & division
+const uniqueDepartments = computed(() => {
+  const depts = new Set()
+  participants.value.forEach(p => {
+    if (p.department) depts.add(p.department)
+  })
+  return Array.from(depts).sort()
+})
+
+const uniqueDivisions = computed(() => {
+  const divs = new Set()
+  participants.value.forEach(p => {
+    if (p.division) divs.add(p.division)
+  })
+  return Array.from(divs).sort()
+})
+
+const adminDept = ref('')
+const isSuperAdmin = computed(() => adminDept.value === 'Super Admin')
+
+// Super Admin States
+const adminAccountsList = ref([])
+const superAdminDivisionsList = ref([])
+const superAdminDeptList = ref([])
+
+// Modals for CRUD
+const showAdminAccountModal = ref(false)
+const adminAccountForm = ref({ id: null, department: '', password: '' })
+
+const showDivisionModal = ref(false)
+const divisionForm = ref({ id: null, name: '', department: '' })
+
+const showChangePasswordModal = ref(false)
+const changePasswordForm = ref({ oldPassword: '', newPassword: '', confirmPassword: '' })
+
+async function fetchAdminAccounts() {
+  if (!isSuperAdmin.value) return
+  try {
+    const res = await fetch(`${API_BASE}/admin/accounts`)
+    if (res.ok) {
+      adminAccountsList.value = await res.json()
+    }
+  } catch (err) {
+    console.error("Gagal memuat akun admin:", err)
+  }
+}
+
+async function fetchSuperAdminDivisions() {
+  if (!isSuperAdmin.value) return
+  try {
+    const res = await fetch(`${API_BASE}/divisions`)
+    if (res.ok) {
+      superAdminDivisionsList.value = await res.json()
+    }
+  } catch (err) {
+    console.error("Gagal memuat divisi:", err)
+  }
+}
+
+async function fetchSuperAdminDepts() {
+  if (!isSuperAdmin.value) return
+  try {
+    const res = await fetch(`${API_BASE}/admin/departments`)
+    if (res.ok) {
+      superAdminDeptList.value = await res.json()
+    }
+  } catch (err) {
+    console.error("Gagal memuat departemen:", err)
+  }
+}
+
+// CRUD Admin Accounts
+async function saveAdminAccount() {
+  if (!adminAccountForm.value.department.trim()) return
+  try {
+    const isEdit = adminAccountForm.value.id !== null
+    const url = isEdit 
+      ? `${API_BASE}/admin/accounts/${adminAccountForm.value.id}` 
+      : `${API_BASE}/admin/accounts`
+    const method = isEdit ? 'PUT' : 'POST'
+    
+    const payload = {
+      department: adminAccountForm.value.department.trim(),
+      password: adminAccountForm.value.password.trim()
+    }
+    
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    
+    if (res.ok) {
+      showAdminAccountModal.value = false
+      adminAccountForm.value = { id: null, department: '', password: '' }
+      successMsg.value = "Akun admin berhasil disimpan."
+      fetchAdminAccounts()
+      fetchSuperAdminDepts()
+    } else {
+      const data = await res.json()
+      errorMsg.value = data.error || "Gagal menyimpan akun admin."
+    }
+  } catch (err) {
+    errorMsg.value = "Koneksi backend gagal."
+  }
+}
+
+async function deleteAdminAccount(id) {
+  if (!confirm("Apakah Anda yakin ingin menghapus akun admin ini?")) return
+  try {
+    const res = await fetch(`${API_BASE}/admin/accounts/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      successMsg.value = "Akun admin berhasil dihapus."
+      fetchAdminAccounts()
+      fetchSuperAdminDepts()
+    } else {
+      const data = await res.json()
+      errorMsg.value = data.error || "Gagal menghapus akun admin."
+    }
+  } catch (err) {
+    errorMsg.value = "Koneksi backend gagal."
+  }
+}
+
+async function approveResetPassword(admin) {
+  const newPassword = prompt(`Masukkan password baru untuk departemen ${admin.department}:`, "admin123")
+  if (newPassword === null) return
+  if (!newPassword.trim()) {
+    alert("Password tidak boleh kosong!")
+    return
+  }
+  try {
+    const res = await fetch(`${API_BASE}/admin/accounts/${admin.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: newPassword.trim(), clearReset: true })
+    })
+    if (res.ok) {
+      alert(`Password untuk ${admin.department} berhasil diubah ke: ${newPassword.trim()}`)
+      fetchAdminAccounts()
+    } else {
+      alert("Gagal mereset password.")
+    }
+  } catch (err) {
+    alert("Koneksi backend gagal.")
+  }
+}
+
+// CRUD Divisions
+async function saveDivision() {
+  if (!divisionForm.value.name.trim() || !divisionForm.value.department.trim()) return
+  try {
+    const isEdit = divisionForm.value.id !== null
+    const url = isEdit 
+      ? `${API_BASE}/admin/divisions/${divisionForm.value.id}` 
+      : `${API_BASE}/admin/divisions`
+    const method = isEdit ? 'PUT' : 'POST'
+    
+    const payload = {
+      name: divisionForm.value.name.trim(),
+      department: divisionForm.value.department.trim()
+    }
+    
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    
+    if (res.ok) {
+      showDivisionModal.value = false
+      divisionForm.value = { id: null, name: '', department: '' }
+      successMsg.value = "Divisi berhasil disimpan."
+      fetchSuperAdminDivisions()
+    } else {
+      const data = await res.json()
+      errorMsg.value = data.error || "Gagal menyimpan divisi."
+    }
+  } catch (err) {
+    errorMsg.value = "Koneksi backend gagal."
+  }
+}
+
+async function deleteDivision(id) {
+  if (!confirm("Apakah Anda yakin ingin menghapus divisi ini?")) return
+  try {
+    const res = await fetch(`${API_BASE}/admin/divisions/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      successMsg.value = "Divisi berhasil dihapus."
+      fetchSuperAdminDivisions()
+    } else {
+      const data = await res.json()
+      errorMsg.value = data.error || "Gagal menghapus divisi."
+    }
+  } catch (err) {
+    errorMsg.value = "Koneksi backend gagal."
+  }
+}
+
+// Change Password for Logged In Admin
+async function changeOwnPassword() {
+  if (!changePasswordForm.value.newPassword.trim()) {
+    alert("Password baru tidak boleh kosong!")
+    return
+  }
+  if (changePasswordForm.value.newPassword !== changePasswordForm.value.confirmPassword) {
+    alert("Konfirmasi password baru tidak cocok!")
+    return
+  }
+  try {
+    const res = await fetch(`${API_BASE}/admin/change-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        department: adminDept.value,
+        newPassword: changePasswordForm.value.newPassword.trim()
+      })
+    })
+    const data = await res.json()
+    if (res.ok) {
+      alert("Password Anda berhasil diubah!")
+      showChangePasswordModal.value = false
+      changePasswordForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
+    } else {
+      alert(data.error || "Gagal mengubah password.")
+    }
+  } catch (err) {
+    alert("Koneksi backend gagal.")
+  }
+}
 
 // Drag and drop index tracker
 const draggedIndex = ref(null)
@@ -346,11 +579,16 @@ function fetchAllData() {
   fetchParticipants()
   fetchMonthlyLeaderboard()
   fetchLeaderboardTab(activeLeaderboardTab.value)
+  if (isSuperAdmin.value) {
+    fetchAdminAccounts()
+    fetchSuperAdminDivisions()
+    fetchSuperAdminDepts()
+  }
 }
 
 async function fetchSessions() {
   try {
-    const res = await fetch(`${API_BASE}/admin/sessions`)
+    const res = await fetch(`${API_BASE}/admin/sessions?department=${adminDept.value}`)
     if (res.ok) {
       sessions.value = await res.json()
       // Detect if there is a currently running session
@@ -582,7 +820,14 @@ async function createSession() {
     const res = await fetch(`${API_BASE}/admin/sessions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(sessionForm.value)
+      body: JSON.stringify({ 
+        date: sessionForm.value.date,
+        pic_karyawan: sessionForm.value.pic_karyawan,
+        pic_intern: sessionForm.value.pic_intern,
+        reference: sessionForm.value.reference,
+        topic: sessionForm.value.topic,
+        department: adminDept.value
+      })
     })
     const data = await res.json()
     if (res.ok) {
@@ -770,12 +1015,18 @@ async function addParticipant() {
     const res = await fetch(`${API_BASE}/admin/participants`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: participantForm.value.name })
+      body: JSON.stringify({ 
+        name: participantForm.value.name,
+        department: participantForm.value.department,
+        division: participantForm.value.division
+      })
     })
     const data = await res.json()
     if (res.ok) {
       successMsg.value = `Peserta "${data.name}" berhasil ditambahkan.`
       participantForm.value.name = ''
+      participantForm.value.department = ''
+      participantForm.value.division = ''
       fetchParticipants()
     } else {
       errorMsg.value = data.error || "Gagal menambah peserta."
@@ -795,7 +1046,11 @@ async function saveEditParticipant() {
     const res = await fetch(`${API_BASE}/admin/participants/${editingParticipant.value.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: editingParticipant.value.name })
+      body: JSON.stringify({ 
+        name: editingParticipant.value.name,
+        department: editingParticipant.value.department,
+        division: editingParticipant.value.division
+      })
     })
     if (res.ok) {
       editingParticipant.value = null
@@ -904,12 +1159,22 @@ function openAddQuestion() {
 
 function openEditQuestion(q) {
   isEditingQuestion.value = true
+  const opts = Array.isArray(q.options) && q.options.length ? [...q.options] : ['', '']
+  
+  let correctAnswer = q.correct_answer
+  if (q.question_type === 'multiple_choice') {
+    const idx = opts.filter(o => o && o.trim() !== '').indexOf(q.correct_answer)
+    if (idx !== -1) {
+      correctAnswer = idx.toString()
+    }
+  }
+
   questionForm.value = {
     id: q.id,
     question_text: q.question_text,
     question_type: q.question_type,
-    options: Array.isArray(q.options) && q.options.length ? [...q.options] : ['', ''],
-    correct_answer: q.correct_answer,
+    options: opts,
+    correct_answer: correctAnswer,
     explanation: q.explanation,
     time_limit: q.time_limit,
     points: q.points,
@@ -1042,20 +1307,24 @@ async function triggerBackupAndWipe() {
 
 function handleLogout() {
   localStorage.removeItem('otm_admin_token')
+  localStorage.removeItem('otm_admin_dept')
   router.push('/')
 }
 
-function getOptionSubmitCount(option) {
+function getOptionSubmitCount(option, index) {
   if (!liveStats.value?.submissions?.distribution) return 0
-  const match = liveStats.value.submissions.distribution.find(
-    d => d.answer.toString().toLowerCase() === option.toString().toLowerCase()
-  )
+  const match = liveStats.value.submissions.distribution.find(d => {
+    const ans = d.answer.toString().toLowerCase();
+    const optText = option.toString().toLowerCase();
+    const optIdxStr = index !== undefined && index !== null ? index.toString() : null;
+    return ans === optText || (optIdxStr && ans === optIdxStr);
+  });
   return match ? match.count : 0
 }
 
-function getOptionSubmitPercentage(option) {
+function getOptionSubmitPercentage(option, index) {
   if (!liveStats.value?.submissions?.submissions_count) return 0
-  const count = getOptionSubmitCount(option)
+  const count = getOptionSubmitCount(option, index)
   const total = liveStats.value.submissions.submissions_count
   return Math.round((count / total) * 100)
 }
@@ -1225,7 +1494,7 @@ function getOptionSubmitPercentage(option) {
                     :key="idx"
                     class="p-6 rounded-2xl border transition-all relative overflow-hidden text-base md:text-xl font-bold flex flex-col justify-between"
                     :class="presentationTimeLeft <= 0 
-                      ? (questions[activeSession.current_question_index]?.question_type !== 'polling' && o === questions[activeSession.current_question_index]?.correct_answer ? 'border-emerald-500 bg-emerald-950/20 text-emerald-400 shadow-sm' : 'border-dark-border/40 bg-dark-surface/50 text-dark-text-secondary')
+                      ? (questions[activeSession.current_question_index]?.question_type !== 'polling' && (o === questions[activeSession.current_question_index]?.correct_answer || questions[activeSession.current_question_index]?.correct_answer === idx.toString()) ? 'border-emerald-500 bg-emerald-950/20 text-emerald-400 shadow-sm' : 'border-dark-border/40 bg-dark-surface/50 text-dark-text-secondary')
                       : 'border-dark-border bg-dark-surface-hover text-dark-text shadow-sm'"
                   >
                     <div class="relative z-10 flex justify-between items-center w-full">
@@ -1235,7 +1504,7 @@ function getOptionSubmitPercentage(option) {
                       </div>
                       <!-- Percentage count once timer is up -->
                       <div v-if="presentationTimeLeft <= 0" class="text-right flex-shrink-0">
-                        <span class="text-sm md:text-lg font-black text-paragon-light">{{ getOptionSubmitCount(o) }} Peserta ({{ getOptionSubmitPercentage(o) }}%)</span>
+                        <span class="text-sm md:text-lg font-black text-paragon-light">{{ getOptionSubmitCount(o, idx) }} Peserta ({{ getOptionSubmitPercentage(o, idx) }}%)</span>
                       </div>
                     </div>
 
@@ -1243,8 +1512,8 @@ function getOptionSubmitPercentage(option) {
                     <div v-if="presentationTimeLeft <= 0" class="w-full bg-dark-surface border border-dark-border rounded-full h-3 mt-4 overflow-hidden shadow-inner relative z-10">
                       <div 
                         class="h-full rounded-full transition-all duration-1000 ease-out" 
-                        :class="questions[activeSession.current_question_index]?.question_type !== 'polling' && o === questions[activeSession.current_question_index]?.correct_answer ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-paragon-medium'"
-                        :style="{ width: `${getOptionSubmitPercentage(o)}%` }"
+                        :class="questions[activeSession.current_question_index]?.question_type !== 'polling' && (o === questions[activeSession.current_question_index]?.correct_answer || questions[activeSession.current_question_index]?.correct_answer === idx.toString()) ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-paragon-medium'"
+                        :style="{ width: `${getOptionSubmitPercentage(o, idx)}%` }"
                       ></div>
                     </div>
                   </div>
@@ -1351,9 +1620,19 @@ function getOptionSubmitPercentage(option) {
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
+        <span class="px-3 py-2 bg-paragon-medium/20 text-accent-cyan rounded-xl text-xs font-black border border-accent-cyan/20">
+          🏢 {{ adminDept }}
+        </span>
+        <button 
+          v-if="adminDept !== 'Super Admin'"
+          @click="showChangePasswordModal = true" 
+          class="px-4 py-2.5 border border-dark-border bg-dark-surface-hover hover:border-paragon-light/30 text-dark-text rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 shadow-sm cursor-pointer"
+        >
+          <span>🔑 Ubah Password</span>
+        </button>
         <button 
           @click="handleLogout" 
-          class="px-4 py-2.5 border border-red-500/30 hover:bg-red-500/10 text-red-400 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 shadow-sm hover:border-red-500/50"
+          class="px-4 py-2.5 border border-red-500/30 hover:bg-red-500/10 text-red-400 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 shadow-sm hover:border-red-500/50 cursor-pointer"
         >
           <LogOut class="w-3.5 h-3.5" />
           <span>Keluar</span>
@@ -1392,8 +1671,17 @@ function getOptionSubmitPercentage(option) {
         :class="activeTab === 'reports' ? 'border-paragon-medium text-paragon-ice font-black bg-paragon-medium/10' : 'border-transparent text-dark-text-secondary hover:text-dark-text font-semibold'"
         class="px-4 py-2.5 rounded-xl border text-xs md:text-sm transition-all flex items-center space-x-2"
       >
-        <Award class="w-4 h-4" />
-        <span>ESOT &amp; Laporan</span>
+        <FileSpreadsheet class="w-4 h-4" />
+        <span>Laporan &amp; Backup</span>
+      </button>
+      <button 
+        v-if="isSuperAdmin"
+        @click="activeTab = 'system'" 
+        :class="activeTab === 'system' ? 'border-accent-cyan text-accent-cyan font-black bg-accent-cyan/10' : 'border-transparent text-dark-text-secondary hover:text-dark-text font-semibold'"
+        class="px-4 py-2.5 rounded-xl border text-xs md:text-sm transition-all flex items-center space-x-2 cursor-pointer"
+      >
+        <ShieldAlert class="w-4 h-4" />
+        <span>System Admin</span>
       </button>
       <button 
         @click="activeTab = 'leaderboards'; fetchLeaderboardTab(activeLeaderboardTab)" 
@@ -1674,13 +1962,13 @@ function getOptionSubmitPercentage(option) {
                     <span class="inline-flex w-5 h-5 bg-dark-surface border border-dark-border rounded items-center justify-center mr-2 text-[10px] text-dark-text-secondary font-black">{{ String.fromCharCode(65 + idx) }}</span>
                     <span>{{ o }}</span>
                   </span>
-                  <span class="text-dark-text-secondary font-extrabold">{{ getOptionSubmitCount(o) }} orang ({{ getOptionSubmitPercentage(o) }}%)</span>
+                  <span class="text-dark-text-secondary font-extrabold">{{ getOptionSubmitCount(o, idx) }} orang ({{ getOptionSubmitPercentage(o, idx) }}%)</span>
                 </div>
                 <!-- Mini Progress Bar -->
                 <div class="w-full bg-dark-surface-hover border border-dark-border/60 rounded-full h-2 overflow-hidden">
                   <div 
                     class="h-full rounded-full bg-paragon-medium transition-all duration-500"
-                    :style="{ width: `${getOptionSubmitPercentage(o)}%` }"
+                    :style="{ width: `${getOptionSubmitPercentage(o, idx)}%` }"
                   ></div>
                 </div>
               </div>
@@ -1807,7 +2095,7 @@ function getOptionSubmitPercentage(option) {
               v-for="(o, oIdx) in q.options" 
               :key="oIdx" 
               class="p-2 border border-dark-border rounded-lg bg-dark-surface truncate flex items-center"
-              :class="q.question_type !== 'polling' && o === q.correct_answer ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-300 font-extrabold' : 'text-dark-text-secondary'"
+              :class="q.question_type !== 'polling' && (o === q.correct_answer || q.correct_answer === oIdx.toString()) ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-300 font-extrabold' : 'text-dark-text-secondary'"
             >
               <span class="inline-flex w-4 h-4 items-center justify-center bg-dark-border rounded text-[9px] uppercase font-bold mr-2 text-dark-text-secondary">{{ String.fromCharCode(65 + oIdx) }}</span>
               <span>{{ o }}</span>
@@ -1816,7 +2104,22 @@ function getOptionSubmitPercentage(option) {
 
           <!-- Answer & Explanation panel -->
           <div class="p-3 bg-dark-surface border border-dark-border rounded-lg space-y-1.5 text-xs text-dark-text-secondary ml-7">
-            <div v-if="q.question_type !== 'polling'">Jawaban Benar: <strong class="text-emerald-700 font-extrabold">{{ q.correct_answer }}</strong></div>
+            <div v-if="q.question_type !== 'polling'">
+              Jawaban Benar: 
+              <strong class="text-emerald-700 font-extrabold">
+                <template v-if="q.question_type === 'multiple_choice'">
+                  <template v-if="!isNaN(parseInt(q.correct_answer)) && q.options[parseInt(q.correct_answer)] !== undefined">
+                    Opsi {{ String.fromCharCode(65 + parseInt(q.correct_answer)) }}: {{ q.options[parseInt(q.correct_answer)] }}
+                  </template>
+                  <template v-else>
+                    {{ q.correct_answer }}
+                  </template>
+                </template>
+                <template v-else>
+                  {{ q.correct_answer }}
+                </template>
+              </strong>
+            </div>
             <div v-if="q.explanation">Penjelasan: <span class="font-medium italic text-slate-500">{{ q.explanation }}</span></div>
             <div v-if="q.image_path" class="text-paragon-medium font-semibold flex items-center space-x-1">
               <span>🖼️ Terdapat File Gambar Terlampir</span>
@@ -1841,6 +2144,32 @@ function getOptionSubmitPercentage(option) {
               placeholder="e.g. Nama Peserta Baru"
               class="w-full bg-dark-surface-hover border border-dark-border text-dark-text text-xs font-semibold rounded-xl px-3 py-2.5 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 placeholder-dark-text-secondary/30"
             />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-paragon-light mb-1.5">Departemen</label>
+            <input 
+              v-model="participantForm.department" 
+              type="text" 
+              list="admin-dept-list"
+              placeholder="e.g. ETRM"
+              class="w-full bg-dark-surface-hover border border-dark-border text-dark-text text-xs font-semibold rounded-xl px-3 py-2.5 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 placeholder-dark-text-secondary/30"
+            />
+            <datalist id="admin-dept-list">
+              <option v-for="d in uniqueDepartments" :key="d" :value="d" />
+            </datalist>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-paragon-light mb-1.5">Divisi</label>
+            <input 
+              v-model="participantForm.division" 
+              type="text" 
+              list="admin-div-list"
+              placeholder="e.g. Technology"
+              class="w-full bg-dark-surface-hover border border-dark-border text-dark-text text-xs font-semibold rounded-xl px-3 py-2.5 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 placeholder-dark-text-secondary/30"
+            />
+            <datalist id="admin-div-list">
+              <option v-for="d in uniqueDivisions" :key="d" :value="d" />
+            </datalist>
           </div>
           <button 
             @click="addParticipant" 
@@ -1893,17 +2222,50 @@ function getOptionSubmitPercentage(option) {
             class="flex items-center justify-between p-3 border border-dark-border hover:border-paragon-light/30 hover:bg-dark-surface-hover rounded-2xl transition-all"
           >
             <!-- Normal State -->
-            <div v-if="editingParticipant?.id !== p.id" class="text-xs font-bold text-dark-text">
-              {{ p.name }}
+            <div v-if="editingParticipant?.id !== p.id" class="flex flex-col text-xs font-bold text-dark-text">
+              <span>{{ p.name }}</span>
+              <span class="text-[10px] text-dark-text-secondary font-medium mt-0.5">
+                🏢 {{ p.department || 'No Dept' }} • {{ p.division || 'No Div' }}
+                <span v-if="p.nickname" class="text-accent-cyan ml-1">(@{{ p.nickname }})</span>
+              </span>
             </div>
             
             <!-- Inline Edit state -->
-            <div v-else class="flex-1 mr-4">
-              <input 
-                v-model="editingParticipant.name" 
-                type="text" 
-                class="w-full bg-dark-surface-hover border border-dark-border text-dark-text text-xs font-semibold rounded-xl px-2.5 py-1.5 focus:border-paragon-medium outline-none focus:ring-2 focus:ring-paragon-medium/30"
-              />
+            <div v-else class="flex-grow mr-4 space-y-2">
+              <div>
+                <label class="block text-[10px] font-bold text-paragon-light mb-1">Nama</label>
+                <input 
+                  v-model="editingParticipant.name" 
+                  type="text" 
+                  class="w-full bg-dark-surface-hover border border-dark-border text-dark-text text-xs font-semibold rounded-xl px-2.5 py-1.5 focus:border-paragon-medium outline-none focus:ring-2 focus:ring-paragon-medium/30"
+                />
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-[10px] font-bold text-paragon-light mb-1">Departemen</label>
+                  <input 
+                    v-model="editingParticipant.department" 
+                    type="text" 
+                    list="admin-edit-dept-list"
+                    class="w-full bg-dark-surface-hover border border-dark-border text-dark-text text-xs font-semibold rounded-xl px-2.5 py-1.5 focus:border-paragon-medium outline-none focus:ring-2 focus:ring-paragon-medium/30"
+                  />
+                  <datalist id="admin-edit-dept-list">
+                    <option v-for="d in uniqueDepartments" :key="d" :value="d" />
+                  </datalist>
+                </div>
+                <div>
+                  <label class="block text-[10px] font-bold text-paragon-light mb-1">Divisi</label>
+                  <input 
+                    v-model="editingParticipant.division" 
+                    type="text" 
+                    list="admin-edit-div-list"
+                    class="w-full bg-dark-surface-hover border border-dark-border text-dark-text text-xs font-semibold rounded-xl px-2.5 py-1.5 focus:border-paragon-medium outline-none focus:ring-2 focus:ring-paragon-medium/30"
+                  />
+                  <datalist id="admin-edit-div-list">
+                    <option v-for="d in uniqueDivisions" :key="d" :value="d" />
+                  </datalist>
+                </div>
+              </div>
             </div>
 
             <!-- Action buttons -->
@@ -2147,6 +2509,133 @@ function getOptionSubmitPercentage(option) {
       </div>
     </div>
 
+    <!-- TAB 6: System Admin (Super Admin only) -->
+    <div v-if="activeTab === 'system' && isSuperAdmin" class="space-y-6 animate-fade-in">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Left Side: Password Reset Requests & Admin Account CRUD -->
+        <div class="lg:col-span-1 space-y-6">
+          
+          <!-- Password Reset Requests -->
+          <div class="bg-dark-surface p-6 rounded-3xl border border-dark-border shadow-xl space-y-4">
+            <h3 class="font-extrabold text-base text-paragon-light border-b border-dark-border pb-3 flex items-center justify-between">
+              <span>Permintaan Reset Password</span>
+              <span class="px-2 py-0.5 rounded bg-red-500/20 text-red-400 text-xs font-black">
+                {{ adminAccountsList.filter(a => a.reset_requested === 1).length }}
+              </span>
+            </h3>
+            
+            <div class="space-y-2 max-h-48 overflow-y-auto pr-1">
+              <div 
+                v-for="admin in adminAccountsList.filter(a => a.reset_requested === 1)" 
+                :key="admin.id"
+                class="flex items-center justify-between p-3 border border-red-500/20 bg-red-500/5 rounded-2xl"
+              >
+                <div class="text-xs font-bold text-red-300">
+                  🏢 {{ admin.department }}
+                </div>
+                <button 
+                  @click="approveResetPassword(admin)"
+                  class="px-2.5 py-1.5 bg-red-500 hover:bg-red-600 text-white font-extrabold text-[10px] rounded-lg transition-all shadow cursor-pointer"
+                >
+                  Reset Password
+                </button>
+              </div>
+              <div v-if="adminAccountsList.filter(a => a.reset_requested === 1).length === 0" class="text-dark-text-secondary text-xs font-bold py-6 text-center">
+                👍 Tidak ada permintaan reset.
+              </div>
+            </div>
+          </div>
+
+          <!-- Admin Management (CRUD) -->
+          <div class="bg-dark-surface p-6 rounded-3xl border border-dark-border shadow-xl space-y-4">
+            <div class="flex justify-between items-center border-b border-dark-border pb-3">
+              <h3 class="font-extrabold text-base text-paragon-light">Kelola Akun Admin</h3>
+              <button 
+                @click="adminAccountForm = { id: null, department: '', password: '' }; showAdminAccountModal = true"
+                class="p-1 text-accent-cyan hover:bg-paragon-medium/10 border border-dark-border rounded-lg transition-all cursor-pointer"
+              >
+                <Plus class="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div class="space-y-2 max-h-[350px] overflow-y-auto pr-1">
+              <div 
+                v-for="admin in adminAccountsList" 
+                :key="admin.id"
+                class="flex items-center justify-between p-3 border border-dark-border hover:bg-dark-surface-hover rounded-2xl transition-all"
+              >
+                <div class="text-xs font-bold text-dark-text flex flex-col">
+                  <span>🏢 {{ admin.department }}</span>
+                  <span class="text-[10px] text-dark-text-secondary font-medium mt-0.5">Password: {{ admin.password }}</span>
+                </div>
+                <div class="flex items-center space-x-1.5">
+                  <button 
+                    @click="adminAccountForm = { id: admin.id, department: admin.department, password: admin.password }; showAdminAccountModal = true"
+                    class="p-1.5 text-dark-text-secondary hover:text-paragon-light bg-dark-surface-hover hover:bg-paragon-medium/10 border border-dark-border rounded-lg transition-all cursor-pointer"
+                  >
+                    <Edit2 class="w-3 h-3" />
+                  </button>
+                  <button 
+                    v-if="admin.department !== 'Super Admin'"
+                    @click="deleteAdminAccount(admin.id)"
+                    class="p-1.5 text-dark-text-secondary hover:text-red-400 bg-dark-surface-hover hover:bg-red-500/10 border border-dark-border rounded-lg transition-all cursor-pointer hover:border-red-500/30"
+                  >
+                    <Trash2 class="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Side: Division CRUD -->
+        <div class="lg:col-span-2 bg-dark-surface p-6 rounded-3xl border border-dark-border shadow-xl space-y-4">
+          <div class="flex justify-between items-center border-b border-dark-border pb-3">
+            <h3 class="font-extrabold text-base text-paragon-light">Kelola Divisi</h3>
+            <button 
+              @click="divisionForm = { id: null, name: '', department: '' }; showDivisionModal = true"
+              class="px-3 py-1.5 bg-paragon-medium hover:bg-paragon-dark text-white font-extrabold text-xs rounded-xl transition-all flex items-center space-x-1 shadow cursor-pointer"
+            >
+              <Plus class="w-4 h-4" />
+              <span>Tambah Divisi</span>
+            </button>
+          </div>
+
+          <div class="space-y-2 max-h-[500px] overflow-y-auto pr-2">
+            <div 
+              v-for="div in superAdminDivisionsList" 
+              :key="div.id"
+              class="flex items-center justify-between p-3.5 border border-dark-border hover:bg-dark-surface-hover rounded-2xl transition-all"
+            >
+              <div class="text-xs font-bold text-dark-text flex flex-col">
+                <span>🔧 {{ div.name }}</span>
+                <span class="text-[10px] text-dark-text-secondary font-medium mt-0.5">🏢 Departemen: {{ div.department }}</span>
+              </div>
+              <div class="flex items-center space-x-1.5">
+                <button 
+                  @click="divisionForm = { id: div.id, name: div.name, department: div.department }; showDivisionModal = true"
+                  class="p-1.5 text-dark-text-secondary hover:text-paragon-light bg-dark-surface-hover hover:bg-paragon-medium/10 border border-dark-border rounded-lg transition-all cursor-pointer"
+                >
+                  <Edit2 class="w-3.5 h-3.5" />
+                </button>
+                <button 
+                  @click="deleteDivision(div.id)"
+                  class="p-1.5 text-dark-text-secondary hover:text-red-400 bg-dark-surface-hover hover:bg-red-500/10 border border-dark-border rounded-lg transition-all cursor-pointer hover:border-red-500/30"
+                >
+                  <Trash2 class="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+            <div v-if="superAdminDivisionsList.length === 0" class="text-dark-text-secondary text-xs font-bold py-12 text-center">
+              Belum ada divisi yang dibuat.
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
     <!-- MODAL: EDIT SESSION CONFIGURATION -->
     <div 
       v-if="showEditSessionModal" 
@@ -2324,14 +2813,27 @@ function getOptionSubmitPercentage(option) {
           <div v-if="questionForm.question_type !== 'polling'">
             <label class="block mb-1.5 text-paragon-light uppercase tracking-widest text-[10px]">Jawaban Benar</label>
             
-            <!-- Dropdown for MCQ and True-False choices -->
+            <!-- Dropdown for MCQ choices -->
             <select 
-              v-if="questionForm.question_type === 'multiple_choice' || questionForm.question_type === 'true_false'"
+              v-if="questionForm.question_type === 'multiple_choice'"
               v-model="questionForm.correct_answer"
               class="w-full bg-dark-surface-hover border border-dark-border text-dark-text rounded-xl px-3 py-2 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 cursor-pointer"
             >
               <option value="" disabled>-- Pilih Jawaban Benar --</option>
-              <option v-for="c in mcqAnswerChoices" :key="c" :value="c">{{ c }}</option>
+              <option v-for="(c, idx) in mcqAnswerChoices" :key="idx" :value="idx.toString()">
+                Opsi {{ String.fromCharCode(65 + idx) }}: {{ c }}
+              </option>
+            </select>
+
+            <!-- Dropdown for True-False choices -->
+            <select 
+              v-else-if="questionForm.question_type === 'true_false'"
+              v-model="questionForm.correct_answer"
+              class="w-full bg-dark-surface-hover border border-dark-border text-dark-text rounded-xl px-3 py-2 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 cursor-pointer"
+            >
+              <option value="" disabled>-- Pilih Jawaban Benar --</option>
+              <option value="True">True</option>
+              <option value="False">False</option>
             </select>
 
             <!-- Standard text input for short answers/others -->
@@ -2410,6 +2912,165 @@ function getOptionSubmitPercentage(option) {
             class="px-5 py-2.5 bg-paragon-medium text-white text-xs font-bold rounded-xl hover:bg-paragon-dark disabled:opacity-50 transition-all shadow"
           >
             {{ loading ? 'Menyimpan...' : 'Simpan Soal' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: ADD / EDIT ADMIN ACCOUNT (Super Admin only) -->
+    <div 
+      v-if="showAdminAccountModal && isSuperAdmin" 
+      class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+    >
+      <div class="bg-dark-surface rounded-3xl border border-dark-border shadow-2xl w-full max-w-md p-6 space-y-6 text-dark-text">
+        <div class="flex justify-between items-center border-b border-dark-border pb-3">
+          <h3 class="font-black text-lg text-paragon-ice flex items-center space-x-2">
+            <ShieldAlert class="w-5 h-5 text-accent-cyan" />
+            <span>{{ adminAccountForm.id ? 'Edit Akun Admin' : 'Tambah Akun Admin' }}</span>
+          </h3>
+          <button @click="showAdminAccountModal = false" class="text-dark-text-secondary hover:text-white p-1.5 transition-colors cursor-pointer bg-transparent border-none">
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+        <div class="space-y-4 text-xs font-semibold text-paragon-light">
+          <div>
+            <label class="block mb-1.5 uppercase tracking-widest text-[10px]">Departemen</label>
+            <input 
+              v-model="adminAccountForm.department" 
+              type="text" 
+              placeholder="e.g. Finance"
+              :disabled="adminAccountForm.department === 'Super Admin'"
+              class="w-full bg-dark-surface-hover border border-dark-border text-dark-text rounded-xl px-3 py-2.5 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 transition-all"
+            />
+          </div>
+          <div>
+            <label class="block mb-1.5 uppercase tracking-widest text-[10px]">Password</label>
+            <input 
+              v-model="adminAccountForm.password" 
+              type="text" 
+              placeholder="e.g. admin123"
+              class="w-full bg-dark-surface-hover border border-dark-border text-dark-text rounded-xl px-3 py-2.5 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 transition-all"
+            />
+          </div>
+        </div>
+        <div class="flex justify-end space-x-3 pt-4 border-t border-dark-border">
+          <button 
+            @click="showAdminAccountModal = false" 
+            class="px-4 py-2 text-xs font-bold text-dark-text-secondary rounded-xl hover:bg-dark-surface-hover transition-all cursor-pointer"
+          >
+            Batal
+          </button>
+          <button 
+            @click="saveAdminAccount" 
+            class="px-5 py-2 bg-paragon-medium text-white text-xs font-bold rounded-xl hover:bg-paragon-dark transition-all shadow cursor-pointer"
+          >
+            Simpan
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: ADD / EDIT DIVISION (Super Admin only) -->
+    <div 
+      v-if="showDivisionModal && isSuperAdmin" 
+      class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+    >
+      <div class="bg-dark-surface rounded-3xl border border-dark-border shadow-2xl w-full max-w-md p-6 space-y-6 text-dark-text">
+        <div class="flex justify-between items-center border-b border-dark-border pb-3">
+          <h3 class="font-black text-lg text-paragon-ice flex items-center space-x-2">
+            <Plus class="w-5 h-5 text-accent-cyan" />
+            <span>{{ divisionForm.id ? 'Edit Divisi' : 'Tambah Divisi' }}</span>
+          </h3>
+          <button @click="showDivisionModal = false" class="text-dark-text-secondary hover:text-white p-1.5 transition-colors cursor-pointer bg-transparent border-none">
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+        <div class="space-y-4 text-xs font-semibold text-paragon-light">
+          <div>
+            <label class="block mb-1.5 uppercase tracking-widest text-[10px]">Nama Divisi</label>
+            <input 
+              v-model="divisionForm.name" 
+              type="text" 
+              placeholder="e.g. Energy Management"
+              class="w-full bg-dark-surface-hover border border-dark-border text-dark-text rounded-xl px-3 py-2.5 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 transition-all"
+            />
+          </div>
+          <div>
+            <label class="block mb-1.5 uppercase tracking-widest text-[10px]">Departemen</label>
+            <select 
+              v-model="divisionForm.department" 
+              class="w-full bg-dark-surface-hover border border-dark-border text-dark-text rounded-xl px-3 py-2.5 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 transition-all cursor-pointer"
+            >
+              <option value="" disabled>-- Pilih Departemen --</option>
+              <option value="Super Admin">Super Admin</option>
+              <option v-for="dept in superAdminDeptList" :key="dept" :value="dept">{{ dept }}</option>
+            </select>
+          </div>
+        </div>
+        <div class="flex justify-end space-x-3 pt-4 border-t border-dark-border">
+          <button 
+            @click="showDivisionModal = false" 
+            class="px-4 py-2 text-xs font-bold text-dark-text-secondary rounded-xl hover:bg-dark-surface-hover transition-all cursor-pointer"
+          >
+            Batal
+          </button>
+          <button 
+            @click="saveDivision" 
+            class="px-5 py-2 bg-paragon-medium text-white text-xs font-bold rounded-xl hover:bg-paragon-dark transition-all shadow cursor-pointer"
+          >
+            Simpan
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: CHANGE OWN PASSWORD (Department Admins) -->
+    <div 
+      v-if="showChangePasswordModal" 
+      class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+    >
+      <div class="bg-dark-surface rounded-3xl border border-dark-border shadow-2xl w-full max-w-md p-6 space-y-6 text-dark-text">
+        <div class="flex justify-between items-center border-b border-dark-border pb-3">
+          <h3 class="font-black text-lg text-paragon-ice flex items-center space-x-2">
+            <ShieldAlert class="w-5 h-5 text-paragon-light" />
+            <span>Ubah Password Admin</span>
+          </h3>
+          <button @click="showChangePasswordModal = false" class="text-dark-text-secondary hover:text-white p-1.5 transition-colors cursor-pointer bg-transparent border-none">
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+        <div class="space-y-4 text-xs font-semibold text-paragon-light">
+          <div>
+            <label class="block mb-1.5 uppercase tracking-widest text-[10px]">Password Baru</label>
+            <input 
+              v-model="changePasswordForm.newPassword" 
+              type="password" 
+              placeholder="Masukkan password baru..."
+              class="w-full bg-dark-surface-hover border border-dark-border text-dark-text rounded-xl px-3 py-2.5 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 transition-all"
+            />
+          </div>
+          <div>
+            <label class="block mb-1.5 uppercase tracking-widest text-[10px]">Konfirmasi Password Baru</label>
+            <input 
+              v-model="changePasswordForm.confirmPassword" 
+              type="password" 
+              placeholder="Ulangi password baru..."
+              class="w-full bg-dark-surface-hover border border-dark-border text-dark-text rounded-xl px-3 py-2.5 outline-none focus:border-paragon-medium focus:ring-2 focus:ring-paragon-medium/30 transition-all"
+            />
+          </div>
+        </div>
+        <div class="flex justify-end space-x-3 pt-4 border-t border-dark-border">
+          <button 
+            @click="showChangePasswordModal = false" 
+            class="px-4 py-2 text-xs font-bold text-dark-text-secondary rounded-xl hover:bg-dark-surface-hover transition-all cursor-pointer"
+          >
+            Batal
+          </button>
+          <button 
+            @click="changeOwnPassword" 
+            class="px-5 py-2 bg-paragon-medium text-white text-xs font-bold rounded-xl hover:bg-paragon-dark transition-all shadow cursor-pointer"
+          >
+            Ubah Password
           </button>
         </div>
       </div>

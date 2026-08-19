@@ -264,12 +264,22 @@ async function submitAnswer(answerText) {
 
     if (res.ok) {
       const data = await res.json()
+      
+      let selectedDisplay = answerText
+      if (currentQuestion.value.question_type === 'multiple_choice' && answerText !== "__TIMEOUT__") {
+        const idx = parseInt(answerText, 10)
+        const opts = currentQuestion.value.options.filter(o => o && o.trim() !== '')
+        if (!isNaN(idx) && opts[idx] !== undefined) {
+          selectedDisplay = opts[idx]
+        }
+      }
+
       feedback.value = {
         is_correct: data.is_correct,
         score: data.score,
         correct_answer: data.correct_answer,
         explanation: data.explanation,
-        selected_answer: answerText === "__TIMEOUT__" ? "Waktu Habis (AFK)" : answerText
+        selected_answer: answerText === "__TIMEOUT__" ? "Waktu Habis (AFK)" : selectedDisplay
       }
       // Play appropriate feedback sound
       if (data.is_correct) {
@@ -307,6 +317,55 @@ const participantsList = ref([])
 const selectedParticipantId = ref('')
 const showLogin = ref(false)
 
+const selectedDepartment = ref('')
+const selectedDivision = ref('')
+const participantNickname = ref('')
+const divisionsList = ref([])
+
+async function fetchDivisions() {
+  try {
+    const res = await fetch(`${API_BASE}/divisions`)
+    if (res.ok) {
+      divisionsList.value = await res.json()
+    }
+  } catch (err) {
+    console.error("Gagal memuat divisi:", err)
+  }
+}
+
+const departments = computed(() => {
+  const depts = new Set()
+  divisionsList.value.forEach(d => {
+    if (d.department) depts.add(d.department)
+  })
+  return Array.from(depts).sort()
+})
+
+const divisions = computed(() => {
+  if (!selectedDepartment.value) return []
+  return divisionsList.value
+    .filter(d => d.department === selectedDepartment.value)
+    .map(d => d.name)
+    .sort()
+})
+
+const filteredParticipants = computed(() => {
+  if (!selectedDepartment.value || !selectedDivision.value) return []
+  return participantsList.value.filter(p => 
+    p.department === selectedDepartment.value && 
+    p.division === selectedDivision.value
+  )
+})
+
+watch(selectedDepartment, () => {
+  selectedDivision.value = ''
+  selectedParticipantId.value = ''
+})
+
+watch(selectedDivision, () => {
+  selectedParticipantId.value = ''
+})
+
 async function fetchParticipants() {
   try {
     const res = await fetch(`${API_BASE}/participants`)
@@ -320,6 +379,14 @@ async function fetchParticipants() {
 
 async function handleJoinSubmit() {
   if (!selectedParticipantId.value) return
+  if (!participantNickname.value.trim()) {
+    alert("Nickname wajib diisi!")
+    return
+  }
+  if (participantNickname.value.trim().length > 15) {
+    alert("Nickname maksimal 15 karakter!")
+    return
+  }
   const selectedObj = participantsList.value.find(p => p.id == selectedParticipantId.value)
   if (!selectedObj) return
 
@@ -328,7 +395,11 @@ async function handleJoinSubmit() {
     const res = await fetch(`${API_BASE}/participants/join`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: selectedObj.name })
+      body: JSON.stringify({ 
+        name: selectedObj.name,
+        avatar_id: 1, // default panda
+        nickname: participantNickname.value.trim()
+      })
     })
 
     const data = await res.json()
@@ -346,6 +417,7 @@ async function handleJoinSubmit() {
 }
 
 onMounted(() => {
+  fetchDivisions()
   // Validate login
   const saved = localStorage.getItem('otm_participant')
   if (!saved) {
@@ -389,27 +461,68 @@ onUnmounted(() => {
       <div class="text-center space-y-3">
         <h2 class="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-paragon-ice to-paragon-light">🎯 Portal Kuis Live</h2>
         <p class="text-sm text-dark-text-secondary max-w-sm mx-auto leading-relaxed">
-          Pilih nama Anda untuk langsung bergabung ke sesi kuis live yang aktif dan raih poin tertinggi!
+          Pilih departemen, divisi, nama, dan nickname Anda untuk bergabung ke sesi kuis live yang aktif!
         </p>
       </div>
 
       <div class="space-y-4">
+        <!-- Department Selection -->
         <div>
+          <label class="block text-xs font-bold text-paragon-light uppercase tracking-widest mb-3">Departemen</label>
+          <select 
+            v-model="selectedDepartment" 
+            class="w-full bg-dark-surface-hover border border-dark-border focus:border-paragon-medium text-dark-text rounded-2xl px-4 py-3 text-sm font-medium transition-all outline-none cursor-pointer hover:border-paragon-light/30 focus:ring-2 focus:ring-paragon-medium/30"
+          >
+            <option value="" disabled>-- Pilih Departemen --</option>
+            <option v-for="dept in departments" :key="dept" :value="dept">
+              {{ dept }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Division Selection -->
+        <div v-if="selectedDepartment">
+          <label class="block text-xs font-bold text-paragon-light uppercase tracking-widest mb-3">Divisi</label>
+          <select 
+            v-model="selectedDivision" 
+            class="w-full bg-dark-surface-hover border border-dark-border focus:border-paragon-medium text-dark-text rounded-2xl px-4 py-3 text-sm font-medium transition-all outline-none cursor-pointer hover:border-paragon-light/30 focus:ring-2 focus:ring-paragon-medium/30"
+          >
+            <option value="" disabled>-- Pilih Divisi --</option>
+            <option v-for="div in divisions" :key="div" :value="div">
+              {{ div }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Name Selection -->
+        <div v-if="selectedDivision">
           <label class="block text-xs font-bold text-paragon-light uppercase tracking-widest mb-3">Pilih Nama Anda</label>
           <select 
             v-model="selectedParticipantId" 
-            class="w-full bg-dark-surface-hover border border-dark-border focus:border-paragon-medium text-dark-text rounded-2xl px-4 py-3.5 text-sm font-medium transition-all outline-none cursor-pointer hover:border-paragon-light/30 focus:ring-2 focus:ring-paragon-medium/30"
+            class="w-full bg-dark-surface-hover border border-dark-border focus:border-paragon-medium text-dark-text rounded-2xl px-4 py-3.5 text-sm font-medium transition-all outline-none cursor-pointer hover:border-paragon-light/30"
           >
             <option value="" disabled>-- Pilih Nama Anda --</option>
-            <option v-for="p in participantsList" :key="p.id" :value="p.id">
+            <option v-for="p in filteredParticipants" :key="p.id" :value="p.id">
               {{ p.name }}
             </option>
           </select>
         </div>
 
+        <!-- Nickname Input -->
+        <div v-if="selectedParticipantId">
+          <label class="block text-xs font-bold text-paragon-light uppercase tracking-widest mb-3">Nickname Anda</label>
+          <input 
+            v-model="participantNickname" 
+            type="text" 
+            placeholder="Masukkan nickname (untuk kuis & leaderboard)"
+            maxlength="15"
+            class="w-full bg-dark-surface-hover border border-dark-border focus:border-paragon-medium text-dark-text rounded-2xl px-4 py-3 text-sm font-semibold focus:ring-2 focus:ring-paragon-medium/30 transition-all outline-none"
+          />
+        </div>
+
         <button 
           @click="handleJoinSubmit" 
-          :disabled="!selectedParticipantId || loading"
+          :disabled="!selectedParticipantId || !participantNickname.trim() || loading"
           class="w-full py-3.5 bg-gradient-to-r from-paragon-medium to-paragon-dark text-white font-extrabold rounded-2xl shadow-lg shadow-paragon-medium/30 hover:shadow-paragon-dark/40 hover:scale-105 active:scale-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100 disabled:shadow-none transition-all flex items-center justify-center text-base"
         >
           <span>🚀 Mulai Kuis</span>
@@ -432,8 +545,16 @@ onUnmounted(() => {
         <div class="space-y-3">
           <h2 class="text-3xl font-black text-paragon-ice">⏳ Menunggu PIC Memulai</h2>
           <p class="text-sm text-dark-text-secondary max-w-sm mx-auto leading-relaxed">
-            Sesi live sudah terhubung! Bersiaplah untuk menjawab 5-10 pertanyaan seru dan tunjukkan kemampuanmu! 🚀
+            Sesi live sudah terhubung, <strong class="text-accent-cyan">{{ participant?.nickname || participant?.name }}</strong>! Bersiaplah untuk menjawab 5-10 pertanyaan seru dan tunjukkan kemampuanmu! 🚀
           </p>
+          <div v-if="participant" class="flex items-center justify-center gap-2 mt-1">
+            <span class="px-2.5 py-0.5 rounded-md text-[10px] font-black bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/20">
+              🏢 {{ participant.department }}
+            </span>
+            <span class="px-2.5 py-0.5 rounded-md text-[10px] font-black bg-paragon-light/10 text-paragon-light border border-dark-border">
+              🔧 {{ participant.division }}
+            </span>
+          </div>
         </div>
 
         <!-- Realtime Display of Joined Participants -->
@@ -451,9 +572,9 @@ onUnmounted(() => {
               class="px-4 py-2.5 bg-dark-surface-hover border border-dark-border rounded-2xl text-xs font-bold text-paragon-ice flex items-center space-x-2.5 hover:border-paragon-light/30 transition-all"
             >
               <div class="w-6 h-6 rounded-full overflow-hidden flex-shrink-0 bg-dark-surface border border-white/10">
-                <img :src="`/assets/avatars/${getAvatarFileName(p)}`" :alt="p.name" class="w-full h-full object-cover" />
+                <img :src="`/assets/avatars/${getAvatarFileName(p)}`" :alt="p.nickname || p.name" class="w-full h-full object-cover" />
               </div>
-              <span class="truncate">{{ p.name }}</span>
+              <span class="truncate">{{ p.nickname || p.name }}</span>
             </div>
           </div>
         </div>
@@ -545,7 +666,7 @@ onUnmounted(() => {
               <button 
                 v-for="(opt, idx) in currentQuestion.options.filter(o => o && o.trim() !== '')" 
                 :key="idx"
-                @click="submitAnswer(opt)"
+                @click="submitAnswer(idx.toString())"
                 :disabled="loading"
                 class="btn-option-mc w-full text-left p-5 rounded-2xl border-2 text-sm font-extrabold active:scale-[0.98] transition-all duration-200 disabled:opacity-50"
                 :class="[
