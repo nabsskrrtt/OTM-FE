@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { 
   Play, FastForward, Users, ListCollapse, Award, 
   Trash2, Upload, FileSpreadsheet, Database, LogOut, Plus, Edit2, Check, X, ShieldAlert,
-  Tv, Minimize2, QrCode, GripVertical, Trophy, RotateCcw
+  Tv, Minimize2, QrCode, GripVertical, Trophy, RotateCcw, Volume2, VolumeX, Music
 } from 'lucide-vue-next'
 import { soundEffects } from '../utils/soundEffects'
 import ImmersiveLeaderboard from '../components/ImmersiveLeaderboard.vue'
@@ -53,6 +53,14 @@ onUnmounted(() => {
   if (pollInterval) clearInterval(pollInterval)
   if (presentationSyncInterval) clearInterval(presentationSyncInterval)
   if (presentationTimerInterval) clearInterval(presentationTimerInterval)
+  if (lobbyAudioInstance) {
+    lobbyAudioInstance.pause()
+    lobbyAudioInstance = null
+  }
+  if (ambientAudioInstance) {
+    ambientAudioInstance.pause()
+    ambientAudioInstance = null
+  }
 })
 
 // Tab Navigation
@@ -139,26 +147,117 @@ let prevQuestionIndex = null
 let prevShowLeaderboard = null
 let prevSessionStatus = null
 let ambientAudioInstance = null
+let lobbyAudioInstance = null
+let initialParticipantsLoaded = false
+const seenParticipantIds = new Set()
+const presentationAudioMuted = ref(false)
+
+function togglePresentationAudio() {
+  soundEffects.resumeContext()
+  presentationAudioMuted.value = !presentationAudioMuted.value
+  if (presentationAudioMuted.value) {
+    if (lobbyAudioInstance) {
+      lobbyAudioInstance.pause()
+      lobbyAudioInstance = null
+    }
+    if (ambientAudioInstance) {
+      ambientAudioInstance.pause()
+      ambientAudioInstance = null
+    }
+  } else {
+    if (activeSession.value) {
+      syncPresentationAudioState(activeSession.value)
+    }
+  }
+}
+
+function checkNewParticipantsInWaitingRoom(participants, isWaitingRoom) {
+  if (!showPresentationMode.value || !isWaitingRoom) {
+    participants.forEach(p => seenParticipantIds.add(p.id))
+    return
+  }
+
+  if (!initialParticipantsLoaded) {
+    participants.forEach(p => seenParticipantIds.add(p.id))
+    initialParticipantsLoaded = true
+    return
+  }
+
+  let hasNew = false
+  participants.forEach(p => {
+    if (!seenParticipantIds.has(p.id)) {
+      seenParticipantIds.add(p.id)
+      hasNew = true
+    }
+  })
+
+  if (hasNew && !presentationAudioMuted.value) {
+    soundEffects.participantJoin()
+  }
+}
 
 function syncPresentationAudioState(session) {
-  if (!showPresentationMode.value) return
-  if (!session) return
+  if (!showPresentationMode.value) {
+    if (lobbyAudioInstance) {
+      lobbyAudioInstance.pause()
+      lobbyAudioInstance = null
+    }
+    if (ambientAudioInstance) {
+      ambientAudioInstance.pause()
+      ambientAudioInstance = null
+    }
+    return
+  }
+  if (!session) {
+    if (lobbyAudioInstance) {
+      lobbyAudioInstance.pause()
+      lobbyAudioInstance = null
+    }
+    return
+  }
+
   const currentIdx = session.current_question_index
   const currentShowLeaderboard = session.show_leaderboard === 1 || session.show_leaderboard === true
   const currentStatus = session.status
 
-  // Start of quiz
-  if (prevSessionStatus && prevSessionStatus !== 'active' && currentStatus === 'active' && currentIdx === -1) {
+  // Waiting Room state: draft or current_question_index is -1 and not finished
+  const isWaitingRoom = (currentStatus === 'draft' || currentIdx === -1) && currentStatus !== 'finished'
+
+  if (isWaitingRoom) {
+    // In waiting room: play lobby music loop
+    if (ambientAudioInstance) {
+      ambientAudioInstance.pause()
+      ambientAudioInstance = null
+    }
+    if (!lobbyAudioInstance && !presentationAudioMuted.value) {
+      try {
+        lobbyAudioInstance = soundEffects.lobbyMusic()
+      } catch (e) {
+        console.warn("Lobby audio not started:", e)
+      }
+    }
+  } else {
+    // Outside waiting room: stop lobby music
+    if (lobbyAudioInstance) {
+      lobbyAudioInstance.pause()
+      lobbyAudioInstance = null
+    }
+  }
+
+  if (presentationAudioMuted.value) return
+
+  // Start of quiz (transition from waiting room to question 1)
+  if (prevSessionStatus && currentIdx >= 0 && prevQuestionIndex === -1) {
     soundEffects.sessionStart()
   }
   // Question index changed (going to next question)
-  if (prevQuestionIndex !== null && prevQuestionIndex !== currentIdx && currentIdx >= 0) {
+  if (prevQuestionIndex !== null && prevQuestionIndex !== currentIdx && currentIdx >= 0 && !currentShowLeaderboard) {
     soundEffects.questionNext()
   }
   // Leaderboard revealed
   if (prevShowLeaderboard !== null && !prevShowLeaderboard && currentShowLeaderboard) {
     soundEffects.correct()
-    if (!ambientAudioInstance) {
+    if (!ambientAudioInstance && !presentationAudioMuted.value) {
       ambientAudioInstance = soundEffects.leaderboardAmbience()
     }
   }
@@ -188,6 +287,7 @@ const showControls = ref(true)
 let mouseTimer = null
 
 function handleMouseMove() {
+  soundEffects.resumeContext()
   showControls.value = true
   if (mouseTimer) clearTimeout(mouseTimer)
   mouseTimer = setTimeout(() => {
@@ -199,9 +299,21 @@ watch(showPresentationMode, (newVal) => {
   if (newVal) {
     window.addEventListener('mousemove', handleMouseMove)
     handleMouseMove()
+    soundEffects.resumeContext()
+    if (activeSession.value) {
+      syncPresentationAudioState(activeSession.value)
+    }
   } else {
     window.removeEventListener('mousemove', handleMouseMove)
     if (mouseTimer) clearTimeout(mouseTimer)
+    if (lobbyAudioInstance) {
+      lobbyAudioInstance.pause()
+      lobbyAudioInstance = null
+    }
+    if (ambientAudioInstance) {
+      ambientAudioInstance.pause()
+      ambientAudioInstance = null
+    }
   }
 })
 
@@ -670,6 +782,12 @@ async function fetchLiveStats() {
       if (liveStats.value.session_status === 'finished') {
         activeSession.value.status = 'finished'
       }
+
+      // Check for newly joined participants in waiting room (plays cheerful join pop in presentation share screen)
+      const currentParticipants = liveStats.value.participants || []
+      const isWaiting = (activeSession.value?.status === 'draft' || activeSession.value?.current_question_index === -1) && activeSession.value?.status !== 'finished'
+      checkNewParticipantsInWaitingRoom(currentParticipants, isWaiting)
+
       syncPresentationAudioState(activeSession.value)
     }
   } catch (err) {
@@ -721,6 +839,12 @@ async function fetchActiveSessionForPresentation() {
         stopPresentationTimer()
         currentQuestionIdForTimer = null
       }
+
+      // Check for newly joined participants in waiting room (presentation mode tab)
+      const currentParticipants = data.participants || []
+      const isWaiting = (data.session?.status === 'draft' || data.session?.current_question_index === -1) && data.session?.status !== 'finished'
+      checkNewParticipantsInWaitingRoom(currentParticipants, isWaiting)
+
       syncPresentationAudioState(activeSession.value)
     }
   } catch (err) {
@@ -935,6 +1059,8 @@ async function deleteSession(id) {
 }
 
 function handleStartSession() {
+  seenParticipantIds.clear()
+  initialParticipantsLoaded = false
   soundEffects.sessionStart()
   updateSessionStatus('active', -1, 0) // Open Waiting lobby
 }
@@ -1353,13 +1479,27 @@ function getOptionSubmitPercentage(option, index) {
           </div>
         </div>
         
-        <button 
-          @click="showPresentationMode = false" 
-          class="px-4 py-2 border border-dark-border bg-dark-surface-hover hover:bg-dark-surface text-dark-text rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer"
-        >
-          <Minimize2 class="w-3.5 h-3.5" />
-          <span>Tutup Layar Presentasi</span>
-        </button>
+        <div class="flex items-center space-x-2.5">
+          <!-- Audio Toggle for Presenter Screen Share -->
+          <button 
+            @click="togglePresentationAudio" 
+            class="px-3.5 py-2 border rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer shadow-sm"
+            :class="presentationAudioMuted ? 'border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20' : 'border-accent-cyan/30 bg-accent-cyan/10 text-accent-cyan hover:bg-accent-cyan/20'"
+            :title="presentationAudioMuted ? 'Buka Suara Presentasi' : 'Matikan Suara Presentasi'"
+          >
+            <VolumeX v-if="presentationAudioMuted" class="w-3.5 h-3.5 text-amber-400" />
+            <Volume2 v-else class="w-3.5 h-3.5 text-accent-cyan animate-pulse" />
+            <span>{{ presentationAudioMuted ? 'Mute' : 'Audio ON' }}</span>
+          </button>
+
+          <button 
+            @click="showPresentationMode = false" 
+            class="px-4 py-2 border border-dark-border bg-dark-surface-hover hover:bg-dark-surface text-dark-text rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer"
+          >
+            <Minimize2 class="w-3.5 h-3.5" />
+            <span>Tutup Layar Presentasi</span>
+          </button>
+        </div>
       </div>
 
       <!-- Presenter View body -->
@@ -1391,9 +1531,15 @@ function getOptionSubmitPercentage(option, index) {
           <!-- Right side: Session Meta & Connected List -->
           <div class="space-y-6 bg-dark-surface p-6 md:p-8 rounded-3xl border border-dark-border shadow-xl">
             <div class="space-y-2">
-              <div class="flex items-center space-x-2 bg-dark-surface-hover border border-dark-border px-3 py-1 rounded-full w-max text-[9px] font-black tracking-widest uppercase">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span>Pendaftaran Live</span>
+              <div class="flex items-center space-x-2">
+                <div class="flex items-center space-x-2 bg-dark-surface-hover border border-dark-border px-3 py-1 rounded-full w-max text-[9px] font-black tracking-widest uppercase">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span>Pendaftaran Live</span>
+                </div>
+                <div v-if="!presentationAudioMuted" class="flex items-center space-x-1.5 bg-accent-cyan/10 border border-accent-cyan/30 text-accent-cyan px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider">
+                  <Music class="w-2.5 h-2.5 animate-bounce" />
+                  <span>Lobby Music ON</span>
+                </div>
               </div>
               <h2 class="text-3xl font-black tracking-tight leading-tight">OTM: {{ activeSession.reference || 'Sharing Session' }}</h2>
               <p class="text-xs text-dark-text-secondary font-semibold">

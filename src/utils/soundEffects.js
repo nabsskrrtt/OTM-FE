@@ -288,6 +288,124 @@ class SoundEffects {
     })
   }
 
+  // Upbeat, playful procedural background music for the waiting room/lobby
+  lobbyMusic() {
+    this.resumeContext()
+    if (!this.audioContext) return null
+
+    const ctx = this.audioContext
+    let active = true
+
+    // Catchy game-lobby chord progression: C major -> Am -> F -> G
+    const progression = [
+      { bass: 130.81, chord: [261.63, 329.63, 392.00], melody: [523.25, 659.25, 523.25, 783.99] }, // C
+      { bass: 110.00, chord: [220.00, 261.63, 329.63], melody: [440.00, 523.25, 659.25, 523.25] }, // Am
+      { bass: 87.31,  chord: [174.61, 220.00, 261.63], melody: [349.23, 440.00, 523.25, 440.00] }, // F
+      { bass: 98.00,  chord: [196.00, 246.94, 293.66], melody: [392.00, 493.88, 587.33, 493.88] }  // G
+    ]
+
+    let step = 0
+
+    const playBar = () => {
+      if (!active) return
+      const now = ctx.currentTime
+      const current = progression[step % progression.length]
+      step++
+
+      // 1. Warm bouncy bass note (0.0s and 0.8s)
+      [0.0, 0.8].forEach((timeOffset, idx) => {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.type = 'triangle'
+        const freq = idx === 1 ? current.bass * 1.5 : current.bass
+        osc.frequency.setValueAtTime(freq, now + timeOffset)
+        gain.gain.setValueAtTime(this.masterVolume * 0.12, now + timeOffset)
+        gain.gain.exponentialRampToValueAtTime(0.001, now + timeOffset + 0.6)
+        osc.start(now + timeOffset)
+        osc.stop(now + timeOffset + 0.6)
+      })
+
+      // 2. Soft synth chord pad
+      current.chord.forEach(freq => {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(freq, now)
+        gain.gain.setValueAtTime(0.001, now)
+        gain.gain.linearRampToValueAtTime(this.masterVolume * 0.04, now + 0.15)
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 1.4)
+        osc.start(now)
+        osc.stop(now + 1.4)
+      })
+
+      // 3. Playful bouncy melody plucks (4 notes per bar)
+      current.melody.forEach((freq, i) => {
+        const noteTime = now + 0.15 + i * 0.35
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(freq, noteTime)
+        gain.gain.setValueAtTime(0.001, noteTime)
+        gain.gain.linearRampToValueAtTime(this.masterVolume * 0.05, noteTime + 0.03)
+        gain.gain.exponentialRampToValueAtTime(0.001, noteTime + 0.28)
+        osc.start(noteTime)
+        osc.stop(noteTime + 0.28)
+      })
+    }
+
+    playBar()
+    const interval = setInterval(playBar, 1600)
+
+    return {
+      pause: () => {
+        active = false
+        clearInterval(interval)
+      }
+    }
+  }
+
+  // Play cheerful participant join sound effect (bubble pop + rising chime)
+  participantJoin() {
+    this.resumeContext()
+    if (!this.audioContext) return
+    const ctx = this.audioContext
+    const now = ctx.currentTime
+
+    // Two rising bright harmonic bells
+    const notes = [659.25, 987.77] // E5, B5
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(freq, now + i * 0.08)
+      gain.gain.setValueAtTime(this.masterVolume * 0.22, now + i * 0.08)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.25)
+      osc.start(now + i * 0.08)
+      osc.stop(now + i * 0.08 + 0.25)
+    })
+
+    // Soft bubble pop effect
+    const pop = ctx.createOscillator()
+    const popGain = ctx.createGain()
+    pop.connect(popGain)
+    popGain.connect(ctx.destination)
+    pop.type = 'triangle'
+    pop.frequency.setValueAtTime(280, now)
+    pop.frequency.exponentialRampToValueAtTime(880, now + 0.07)
+    popGain.gain.setValueAtTime(this.masterVolume * 0.16, now)
+    popGain.gain.exponentialRampToValueAtTime(0.001, now + 0.07)
+    pop.start(now)
+    pop.stop(now + 0.07)
+  }
+
   // Play a pulsing arpeggio loop for leaderboards
   leaderboardAmbience() {
     this.resumeContext()
