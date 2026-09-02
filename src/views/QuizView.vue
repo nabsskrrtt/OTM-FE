@@ -131,7 +131,7 @@ async function fetchActiveSession() {
     joinedParticipants.value = data.participants || []
 
     // If session is active and leaderboard is showing
-    if (data.session.status === 'active' && data.session.show_leaderboard) {
+    if (data.session.status === 'active' && (data.session.show_leaderboard == 1 || data.session.show_leaderboard === true)) {
       currentQuestion.value = null
       feedback.value = null
       if (timerInterval) clearInterval(timerInterval)
@@ -303,10 +303,13 @@ async function submitAnswer(answerText) {
 async function fetchLeaderboard() {
   if (!sessionData.value) return
   try {
-    const res = await fetch(`${API_BASE}/sessions/${sessionData.value.id}/active-stats?t=${Date.now()}`)
+    let res = await fetch(`${API_BASE}/sessions/${sessionData.value.id}/active-stats?t=${Date.now()}`)
+    if (!res.ok) {
+      res = await fetch(`${API_BASE}/admin/sessions/${sessionData.value.id}/active-stats?t=${Date.now()}`)
+    }
     if (res.ok) {
       const data = await res.json()
-      leaderboard.value = data.participants || []
+      leaderboard.value = data.participants || data.leaderboard || []
     }
   } catch (err) {
     console.error("Gagal memuat leaderboard:", err)
@@ -588,7 +591,7 @@ onUnmounted(() => {
 
       <!-- 1.5. Temporary Leaderboard Screen -->
       <div 
-        v-else-if="sessionActive && sessionData && sessionData.status === 'active' && sessionData.show_leaderboard" 
+        v-else-if="sessionActive && sessionData && sessionData.status === 'active' && (sessionData.show_leaderboard == 1 || sessionData.show_leaderboard === true)" 
         class="bg-dark-surface rounded-3xl border border-dark-border shadow-2xl p-8 md:p-10 space-y-8 text-center"
       >
         <div class="space-y-3">
