@@ -288,13 +288,14 @@ class SoundEffects {
     })
   }
 
-  // Upbeat, playful procedural background music for the waiting room/lobby
-  lobbyMusic() {
+  // Procedural background synthesizer (Fallback & Classic option)
+  lobbySynth(options = {}) {
     this.resumeContext()
     if (!this.audioContext) return null
 
     const ctx = this.audioContext
     let active = true
+    const volMultiplier = options.volume !== undefined ? options.volume : 0.65
 
     // Catchy game-lobby chord progression: C major -> Am -> F -> G
     const progression = [
@@ -321,7 +322,7 @@ class SoundEffects {
         osc.type = 'triangle'
         const freq = idx === 1 ? current.bass * 1.5 : current.bass
         osc.frequency.setValueAtTime(freq, now + timeOffset)
-        gain.gain.setValueAtTime(this.masterVolume * 0.12, now + timeOffset)
+        gain.gain.setValueAtTime(this.masterVolume * volMultiplier * 0.14, now + timeOffset)
         gain.gain.exponentialRampToValueAtTime(0.001, now + timeOffset + 0.6)
         osc.start(now + timeOffset)
         osc.stop(now + timeOffset + 0.6)
@@ -336,7 +337,7 @@ class SoundEffects {
         osc.type = 'sine'
         osc.frequency.setValueAtTime(freq, now)
         gain.gain.setValueAtTime(0.001, now)
-        gain.gain.linearRampToValueAtTime(this.masterVolume * 0.04, now + 0.15)
+        gain.gain.linearRampToValueAtTime(this.masterVolume * volMultiplier * 0.05, now + 0.15)
         gain.gain.exponentialRampToValueAtTime(0.001, now + 1.4)
         osc.start(now)
         osc.stop(now + 1.4)
@@ -352,7 +353,7 @@ class SoundEffects {
         osc.type = 'sine'
         osc.frequency.setValueAtTime(freq, noteTime)
         gain.gain.setValueAtTime(0.001, noteTime)
-        gain.gain.linearRampToValueAtTime(this.masterVolume * 0.05, noteTime + 0.03)
+        gain.gain.linearRampToValueAtTime(this.masterVolume * volMultiplier * 0.06, noteTime + 0.03)
         gain.gain.exponentialRampToValueAtTime(0.001, noteTime + 0.28)
         osc.start(noteTime)
         osc.stop(noteTime + 0.28)
@@ -361,12 +362,102 @@ class SoundEffects {
 
     playBar()
     const interval = setInterval(playBar, 1600)
+    if (options.onPlay) options.onPlay()
 
     return {
       pause: () => {
         active = false
         clearInterval(interval)
+      },
+      resume: () => {
+        active = true
+      },
+      setVolume: () => {},
+      setTrack: () => {}
+    }
+  }
+
+  // Upbeat, rich background music for the waiting room/lobby
+  // Supports audio tracks: 'upbeat' | 'chill' | 'arcade' | 'synth'
+  lobbyMusic(trackId = 'upbeat', options = {}) {
+    this.resumeContext()
+
+    if (trackId === 'synth') {
+      return this.lobbySynth(options)
+    }
+
+    const trackMap = {
+      upbeat: '/assets/audio/lobby-upbeat.wav',
+      chill: '/assets/audio/lobby-chill.wav',
+      arcade: '/assets/audio/lobby-arcade.wav'
+    }
+
+    const audioSrc = trackMap[trackId] || trackMap.upbeat
+    let audio = null
+
+    try {
+      audio = new Audio(audioSrc)
+      audio.loop = true
+      const vol = options.volume !== undefined ? options.volume : 0.65
+      audio.volume = Math.max(0, Math.min(1, this.masterVolume * vol))
+
+      const playPromise = audio.play()
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          if (options.onPlay) options.onPlay()
+        }).catch(err => {
+          console.warn("Lobby audio autoplay restricted by browser:", err?.message || err)
+          if (options.onAutoplayBlocked) options.onAutoplayBlocked(err)
+        })
       }
+
+      return {
+        audio,
+        setVolume: (newVol) => {
+          if (audio) {
+            audio.volume = Math.max(0, Math.min(1, this.masterVolume * newVol))
+          }
+        },
+        setTrack: (newTrackId) => {
+          if (newTrackId === 'synth') {
+            if (audio) {
+              audio.pause()
+              audio = null
+            }
+            return
+          }
+          const nextSrc = trackMap[newTrackId] || trackMap.upbeat
+          if (audio) {
+            audio.pause()
+            audio.src = nextSrc
+            audio.currentTime = 0
+            audio.play().then(() => {
+              if (options.onPlay) options.onPlay()
+            }).catch((err) => {
+              if (options.onAutoplayBlocked) options.onAutoplayBlocked(err)
+            })
+          }
+        },
+        pause: () => {
+          if (audio) {
+            audio.pause()
+            audio.currentTime = 0
+            audio = null
+          }
+        },
+        resume: () => {
+          if (audio) {
+            audio.play().then(() => {
+              if (options.onPlay) options.onPlay()
+            }).catch((err) => {
+              if (options.onAutoplayBlocked) options.onAutoplayBlocked(err)
+            })
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("HTML5 audio unavailable, falling back to procedural synth:", e)
+      return this.lobbySynth(options)
     }
   }
 

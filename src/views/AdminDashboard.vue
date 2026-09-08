@@ -2,7 +2,7 @@
 import { ref, onMounted, onUnmounted, computed, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { 
-  Play, FastForward, Users, ListCollapse, Award, 
+  Play, Pause, FastForward, Users, ListCollapse, Award, 
   Trash2, Upload, FileSpreadsheet, Database, LogOut, Plus, Edit2, Check, X, ShieldAlert,
   Tv, Minimize2, QrCode, GripVertical, Trophy, RotateCcw, Volume2, VolumeX, Music
 } from 'lucide-vue-next'
@@ -152,19 +152,123 @@ let initialParticipantsLoaded = false
 const seenParticipantIds = new Set()
 const presentationAudioMuted = ref(false)
 
+// Waiting Room Background Music (BGM) State
+const bgmTrack = ref(localStorage.getItem('otm_bgm_track') || 'upbeat')
+const bgmVolume = ref(parseFloat(localStorage.getItem('otm_bgm_volume') ?? '0.65'))
+const isBgmPlaying = ref(false)
+const isAutoplayBlocked = ref(false)
+
+const bgmTracks = [
+  { id: 'upbeat', name: '🎵 Kahoot Groove', desc: 'Upbeat & Funky' },
+  { id: 'chill', name: '☕ Morning Lofi', desc: 'Smooth & Santai' },
+  { id: 'arcade', name: '🕹️ Retro 8-Bit', desc: 'Chiptune Game' },
+  { id: 'synth', name: '🎹 Synth Classic', desc: 'Procedural Chords' }
+]
+
+const bgmTrackName = computed(() => {
+  return bgmTracks.find(t => t.id === bgmTrack.value)?.name || 'Kahoot Groove'
+})
+
+function startWaitingRoomBgm() {
+  if (lobbyAudioInstance) {
+    lobbyAudioInstance.pause()
+    lobbyAudioInstance = null
+  }
+  try {
+    lobbyAudioInstance = soundEffects.lobbyMusic(bgmTrack.value, {
+      volume: bgmVolume.value,
+      onPlay: () => {
+        isBgmPlaying.value = true
+        isAutoplayBlocked.value = false
+      },
+      onAutoplayBlocked: () => {
+        isBgmPlaying.value = false
+        isAutoplayBlocked.value = true
+      }
+    })
+    isBgmPlaying.value = true
+  } catch (e) {
+    console.warn("Failed to start waiting room BGM:", e)
+  }
+}
+
+function stopWaitingRoomBgm() {
+  if (lobbyAudioInstance) {
+    lobbyAudioInstance.pause()
+    lobbyAudioInstance = null
+  }
+  isBgmPlaying.value = false
+  isAutoplayBlocked.value = false
+}
+
+function setBgmVolume(val) {
+  bgmVolume.value = Math.max(0, Math.min(1, parseFloat(val)))
+  localStorage.setItem('otm_bgm_volume', bgmVolume.value.toString())
+  if (lobbyAudioInstance && lobbyAudioInstance.setVolume) {
+    lobbyAudioInstance.setVolume(bgmVolume.value)
+  }
+}
+
+function selectBgmTrack(trackId) {
+  bgmTrack.value = trackId
+  localStorage.setItem('otm_bgm_track', trackId)
+  if (lobbyAudioInstance) {
+    if (lobbyAudioInstance.setTrack) {
+      lobbyAudioInstance.setTrack(trackId)
+    } else {
+      stopWaitingRoomBgm()
+      if (!presentationAudioMuted.value) {
+        startWaitingRoomBgm()
+      }
+    }
+  } else if (!presentationAudioMuted.value && showPresentationMode.value) {
+    startWaitingRoomBgm()
+  }
+}
+
+function toggleBgmPlay() {
+  soundEffects.resumeContext()
+  isAutoplayBlocked.value = false
+  if (isBgmPlaying.value) {
+    stopWaitingRoomBgm()
+  } else {
+    presentationAudioMuted.value = false
+    startWaitingRoomBgm()
+  }
+}
+
+function resumeBlockedAutoplay() {
+  soundEffects.resumeContext()
+  isAutoplayBlocked.value = false
+  presentationAudioMuted.value = false
+  startWaitingRoomBgm()
+}
+
+function handlePresentationOverlayClick() {
+  if (isAutoplayBlocked.value) {
+    resumeBlockedAutoplay()
+  }
+}
+
+function openPresentationMode() {
+  soundEffects.resumeContext()
+  showPresentationMode.value = true
+  if (activeSession.value) {
+    syncPresentationAudioState(activeSession.value)
+  }
+}
+
 function togglePresentationAudio() {
   soundEffects.resumeContext()
   presentationAudioMuted.value = !presentationAudioMuted.value
   if (presentationAudioMuted.value) {
-    if (lobbyAudioInstance) {
-      lobbyAudioInstance.pause()
-      lobbyAudioInstance = null
-    }
+    stopWaitingRoomBgm()
     if (ambientAudioInstance) {
       ambientAudioInstance.pause()
       ambientAudioInstance = null
     }
   } else {
+    isAutoplayBlocked.value = false
     if (activeSession.value) {
       syncPresentationAudioState(activeSession.value)
     }
@@ -198,10 +302,7 @@ function checkNewParticipantsInWaitingRoom(participants, isWaitingRoom) {
 
 function syncPresentationAudioState(session) {
   if (!showPresentationMode.value) {
-    if (lobbyAudioInstance) {
-      lobbyAudioInstance.pause()
-      lobbyAudioInstance = null
-    }
+    stopWaitingRoomBgm()
     if (ambientAudioInstance) {
       ambientAudioInstance.pause()
       ambientAudioInstance = null
@@ -209,10 +310,7 @@ function syncPresentationAudioState(session) {
     return
   }
   if (!session) {
-    if (lobbyAudioInstance) {
-      lobbyAudioInstance.pause()
-      lobbyAudioInstance = null
-    }
+    stopWaitingRoomBgm()
     return
   }
 
@@ -230,18 +328,11 @@ function syncPresentationAudioState(session) {
       ambientAudioInstance = null
     }
     if (!lobbyAudioInstance && !presentationAudioMuted.value) {
-      try {
-        lobbyAudioInstance = soundEffects.lobbyMusic()
-      } catch (e) {
-        console.warn("Lobby audio not started:", e)
-      }
+      startWaitingRoomBgm()
     }
   } else {
     // Outside waiting room: stop lobby music
-    if (lobbyAudioInstance) {
-      lobbyAudioInstance.pause()
-      lobbyAudioInstance = null
-    }
+    stopWaitingRoomBgm()
   }
 
   if (presentationAudioMuted.value) return
@@ -306,10 +397,7 @@ watch(showPresentationMode, (newVal) => {
   } else {
     window.removeEventListener('mousemove', handleMouseMove)
     if (mouseTimer) clearTimeout(mouseTimer)
-    if (lobbyAudioInstance) {
-      lobbyAudioInstance.pause()
-      lobbyAudioInstance = null
-    }
+    stopWaitingRoomBgm()
     if (ambientAudioInstance) {
       ambientAudioInstance.pause()
       ambientAudioInstance = null
@@ -1462,6 +1550,7 @@ function getOptionSubmitPercentage(option, index) {
     <div 
       v-if="showPresentationMode" 
       class="fixed inset-0 bg-dark-bg text-dark-text z-[100] flex flex-col overflow-y-auto"
+      @click="handlePresentationOverlayClick"
     >
       <!-- Emoji Reactions Overlay Container -->
       <div id="emoji-reactions-container" class="fixed inset-0 pointer-events-none z-[100] overflow-hidden"></div>
@@ -1536,9 +1625,9 @@ function getOptionSubmitPercentage(option, index) {
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                   <span>Pendaftaran Live</span>
                 </div>
-                <div v-if="!presentationAudioMuted" class="flex items-center space-x-1.5 bg-accent-cyan/10 border border-accent-cyan/30 text-accent-cyan px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider">
+                <div v-if="!presentationAudioMuted && isBgmPlaying" class="flex items-center space-x-1.5 bg-accent-cyan/10 border border-accent-cyan/30 text-accent-cyan px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider">
                   <Music class="w-2.5 h-2.5 animate-bounce" />
-                  <span>Lobby Music ON</span>
+                  <span>BGM: {{ bgmTrackName }}</span>
                 </div>
               </div>
               <h2 class="text-3xl font-black tracking-tight leading-tight">OTM: {{ activeSession.reference || 'Sharing Session' }}</h2>
@@ -1567,6 +1656,119 @@ function getOptionSubmitPercentage(option, index) {
                   </div>
                   <span class="truncate">{{ p.name }}</span>
                 </div>
+              </div>
+            </div>
+
+            <!-- Interactive BGM Waiting Room Player for Sharescreen POV -->
+            <div class="pt-4 border-t border-dark-border space-y-3">
+              <!-- Top Row: Visualizer, Track Title, Play/Pause Button -->
+              <div class="p-3.5 bg-dark-bg/60 border border-dark-border rounded-2xl flex items-center justify-between gap-3 shadow-inner">
+                <div class="flex items-center space-x-3 min-w-0">
+                  <!-- Animated Equalizer Bars -->
+                  <div class="flex items-end space-x-1 h-7 px-2 py-1 bg-dark-surface rounded-xl border border-dark-border flex-shrink-0 shadow-sm">
+                    <span 
+                      v-for="bar in 5" 
+                      :key="bar" 
+                      class="w-1 bg-gradient-to-t from-accent-cyan to-emerald-400 rounded-full transition-all"
+                      :class="isBgmPlaying && !presentationAudioMuted ? 'animate-equalizer-' + bar : 'h-1.5 opacity-30'"
+                    ></span>
+                  </div>
+
+                  <div class="min-w-0">
+                    <div class="flex items-center space-x-1.5">
+                      <span class="text-[9px] font-black tracking-widest uppercase text-accent-cyan">BGM Waiting Room</span>
+                      <span 
+                        v-if="isBgmPlaying && !presentationAudioMuted" 
+                        class="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-[8px] font-extrabold uppercase tracking-wider"
+                      >
+                        Playing
+                      </span>
+                      <span 
+                        v-else 
+                        class="px-1.5 py-0.2 bg-slate-500/20 text-slate-400 border border-slate-500/30 rounded text-[8px] font-extrabold uppercase tracking-wider"
+                      >
+                        Paused
+                      </span>
+                    </div>
+                    <span class="text-xs font-black text-dark-text block truncate mt-0.5">
+                      {{ bgmTrackName }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Play/Pause Button -->
+                <button 
+                  @click="toggleBgmPlay"
+                  class="px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer shadow flex-shrink-0"
+                  :class="isBgmPlaying && !presentationAudioMuted ? 'bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/30 hover:bg-accent-cyan/25' : 'bg-paragon-medium hover:bg-paragon-dark text-white border border-paragon-light/30'"
+                  :title="isBgmPlaying && !presentationAudioMuted ? 'Jeda Musik' : 'Putar Musik'"
+                >
+                  <Pause v-if="isBgmPlaying && !presentationAudioMuted" class="w-3.5 h-3.5" />
+                  <Play v-else class="w-3.5 h-3.5" />
+                  <span>{{ isBgmPlaying && !presentationAudioMuted ? 'Jeda' : 'Putar' }}</span>
+                </button>
+              </div>
+
+              <!-- Autoplay Blocked Alert Notification -->
+              <div 
+                v-if="isAutoplayBlocked"
+                @click="resumeBlockedAutoplay"
+                class="p-3 bg-amber-500/15 border border-amber-500/40 rounded-2xl flex items-center justify-between text-xs cursor-pointer hover:bg-amber-500/25 transition-all text-amber-200 shadow-sm animate-pulse"
+              >
+                <div class="flex items-center space-x-2.5">
+                  <Volume2 class="w-4 h-4 text-amber-400 flex-shrink-0" />
+                  <span class="font-bold leading-tight">Browser menunda audio. Klik di sini untuk menyalakan musik!</span>
+                </div>
+                <span class="px-2.5 py-1 bg-amber-500/30 rounded-lg text-[10px] font-black uppercase tracking-wider text-amber-300 flex-shrink-0">
+                  Nyalakan
+                </span>
+              </div>
+
+              <!-- Track Selector & Volume Controls Row -->
+              <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+                <!-- Track Selector Pills -->
+                <div class="flex items-center space-x-1 overflow-x-auto pb-1 sm:pb-0">
+                  <button 
+                    v-for="t in bgmTracks" 
+                    :key="t.id"
+                    @click="selectBgmTrack(t.id)"
+                    class="px-2.5 py-1 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer border flex-shrink-0"
+                    :class="bgmTrack === t.id ? 'bg-paragon-medium text-white border-paragon-medium shadow-sm' : 'bg-dark-surface hover:bg-dark-surface-hover text-dark-text-secondary border-dark-border'"
+                    :title="t.desc"
+                  >
+                    {{ t.name }}
+                  </button>
+                </div>
+
+                <!-- Volume Slider -->
+                <div class="flex items-center space-x-2 justify-end">
+                  <button 
+                    @click="togglePresentationAudio" 
+                    class="text-dark-text-secondary hover:text-dark-text transition-colors cursor-pointer"
+                    :title="presentationAudioMuted ? 'Buka Suara' : 'Bisukan Suara'"
+                  >
+                    <VolumeX v-if="bgmVolume === 0 || presentationAudioMuted" class="w-3.5 h-3.5 text-amber-400" />
+                    <Volume2 v-else class="w-3.5 h-3.5 text-accent-cyan" />
+                  </button>
+                  <input 
+                    type="range" 
+                    min="0" 
+                    max="1" 
+                    step="0.05" 
+                    :value="presentationAudioMuted ? 0 : bgmVolume" 
+                    @input="e => setBgmVolume(e.target.value)"
+                    class="w-20 h-1.5 bg-dark-surface rounded-lg appearance-none cursor-pointer accent-accent-cyan" 
+                  />
+                  <span class="text-[10px] font-bold text-dark-text-secondary w-7 text-right">
+                    {{ presentationAudioMuted ? '0%' : Math.round(bgmVolume * 100) + '%' }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Screen Share Audio Tips -->
+              <div class="text-[10px] text-dark-text-secondary/80 flex items-center space-x-1 pt-0.5">
+                <span>💡</span>
+                <span><strong>Tips Screen Share:</strong> Centang opsi <em>"Share audio" / "Bagikan suara komputer"</em> di Zoom/Meet agar peserta mendengar musiknya.</span>
               </div>
             </div>
           </div>
@@ -1986,7 +2188,7 @@ function getOptionSubmitPercentage(option, index) {
                   <span>Edit Sesi</span>
                 </button>
                 <button 
-                  @click="showPresentationMode = true"
+                  @click="openPresentationMode"
                   class="px-3.5 py-2.5 bg-paragon-medium hover:bg-paragon-dark text-white rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 shadow-sm"
                 >
                   <Tv class="w-3.5 h-3.5" />
