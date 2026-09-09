@@ -2223,6 +2223,97 @@ function getOptionSubmitPercentage(option, index) {
             </div>
           </div>
 
+          <!-- Mini BGM Controller in Active Session Dashboard Workspace -->
+          <div 
+            v-if="activeSession.status === 'draft' || activeSession.current_question_index === -1"
+            class="p-4 rounded-2xl bg-dark-surface-hover border border-dark-border space-y-3"
+          >
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div class="flex items-center space-x-3">
+                <div class="flex items-end space-x-1 h-6 px-2 py-1 bg-dark-surface rounded-xl border border-dark-border shadow-sm flex-shrink-0">
+                  <span 
+                    v-for="bar in 5" 
+                    :key="bar" 
+                    class="w-1 bg-gradient-to-t from-accent-cyan to-emerald-400 rounded-full transition-all"
+                    :class="isBgmPlaying && !presentationAudioMuted ? 'animate-equalizer-' + bar : 'h-1.5 opacity-30'"
+                  ></span>
+                </div>
+                <div>
+                  <div class="flex items-center space-x-1.5">
+                    <span class="text-[9px] font-black tracking-widest uppercase text-accent-cyan">BGM Waiting Room</span>
+                    <span 
+                      v-if="isBgmPlaying && !presentationAudioMuted" 
+                      class="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-[8px] font-extrabold uppercase"
+                    >
+                      Playing
+                    </span>
+                    <span 
+                      v-else 
+                      class="px-1.5 py-0.2 bg-slate-500/20 text-slate-400 border border-slate-500/30 rounded text-[8px] font-extrabold uppercase"
+                    >
+                      Paused
+                    </span>
+                  </div>
+                  <span class="text-xs font-bold text-dark-text block">{{ bgmTrackName }}</span>
+                </div>
+              </div>
+
+              <!-- Controls -->
+              <div class="flex items-center space-x-2">
+                <button 
+                  @click="toggleBgmPlay"
+                  class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer shadow-sm"
+                  :class="isBgmPlaying && !presentationAudioMuted ? 'bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/30 hover:bg-accent-cyan/25' : 'bg-paragon-medium hover:bg-paragon-dark text-white border border-paragon-light/30'"
+                >
+                  <Pause v-if="isBgmPlaying && !presentationAudioMuted" class="w-3.5 h-3.5" />
+                  <Play v-else class="w-3.5 h-3.5" />
+                  <span>{{ isBgmPlaying && !presentationAudioMuted ? 'Jeda Musik' : 'Putar Musik' }}</span>
+                </button>
+
+                <button 
+                  @click="openPresentationMode"
+                  class="px-3 py-1.5 bg-dark-surface hover:bg-dark-surface-hover text-paragon-light border border-dark-border rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5"
+                  title="Buka tampilan layar penuh untuk share screen"
+                >
+                  <Tv class="w-3.5 h-3.5" />
+                  <span>Layar Share Screen</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Track Selector & Volume -->
+            <div class="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-dark-border/40 text-xs">
+              <div class="flex items-center space-x-1 overflow-x-auto">
+                <button 
+                  v-for="t in bgmTracks" 
+                  :key="t.id"
+                  @click="selectBgmTrack(t.id)"
+                  class="px-2.5 py-1 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer border flex-shrink-0"
+                  :class="bgmTrack === t.id ? 'bg-paragon-medium text-white border-paragon-medium shadow-sm' : 'bg-dark-surface hover:bg-dark-surface-hover text-dark-text-secondary border-dark-border'"
+                >
+                  {{ t.name }}
+                </button>
+              </div>
+
+              <div class="flex items-center space-x-2">
+                <VolumeX v-if="bgmVolume === 0 || presentationAudioMuted" class="w-3.5 h-3.5 text-amber-400" />
+                <Volume2 v-else class="w-3.5 h-3.5 text-accent-cyan" />
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="1" 
+                  step="0.05" 
+                  :value="presentationAudioMuted ? 0 : bgmVolume" 
+                  @input="e => setBgmVolume(e.target.value)"
+                  class="w-20 h-1.5 bg-dark-surface rounded-lg appearance-none cursor-pointer accent-accent-cyan" 
+                />
+                <span class="text-[10px] font-bold text-dark-text-secondary w-7 text-right">
+                  {{ presentationAudioMuted ? '0%' : Math.round(bgmVolume * 100) + '%' }}
+                </span>
+              </div>
+            </div>
+          </div>
+
           <!-- Control Actions buttons -->
           <div class="flex flex-wrap gap-3 border-t border-dark-border pt-6">
             <!-- 1. Lobby room start -->
